@@ -13,7 +13,7 @@
 
     Incoming transfer, when it settles: the settlement account pays the customer
     account, then the fee (if any) moves from the customer to fee income. [Returned]
-    sends the amount back.
+    refunds that fee and sends the amount back.
 
     Every entry has the transfer id as [reference] and [<event id>/<leg>] as its
     idempotency key, where the event id is the provider event that caused the transition,

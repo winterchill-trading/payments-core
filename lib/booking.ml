@@ -162,7 +162,20 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
     ]
   | In, Pending, Settled -> deposit_legs chart ~event_id ~t ~at
   | In, Settled, Returned ->
-    [ transfer_entry
+    (* Sending an incoming payment back undoes it, so the fee charged on arrival is
+       refunded first; otherwise a customer who received exactly the amount could not
+       cover the return. *)
+    fee_legs
+      t
+      (transfer_entry
+         ~tag:"fee-refund"
+         ~event_id
+         ~t
+         ~at
+         ~debit:(chart.fee_income (currency t))
+         ~credit:t.account
+         t.fee)
+    @ [ transfer_entry
         ~tag:"return"
         ~event_id
         ~t
