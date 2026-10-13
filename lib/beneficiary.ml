@@ -45,7 +45,7 @@ module Stable = struct
       ; name : string
       ; destination : Destination.t
       ; trusted : bool
-      ; first_seen : Time_ns.Stable.V1.t
+      ; first_seen : Utc_time.Stable.V1.t
       ; payee_check : Payee_check.t option
       }
     [@@deriving bin_io, sexp, compare, equal, hash, fields]

@@ -15,7 +15,7 @@ module Invoice = struct
     { raw : string
     ; network : Network.Stable.V1.t
     ; amount_msat : int option
-    ; timestamp : Time_ns.Stable.V1.t
+    ; timestamp : Utc_time.Stable.V1.t
     ; expiry : Time_ns.Span.Stable.V2.t
     ; payment_hash : string
     ; description : string option
