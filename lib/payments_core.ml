@@ -4,3 +4,4 @@ module Network = Network
 module Rail = Rail
 module Iban = Iban
 module Bic = Bic
+module Base58 = Base58
