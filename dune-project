@@ -25,5 +25,9 @@
   cryptokit
   zarith
   ppx_jane
+  core_unix
   money
-  ledger))
+  ledger
+  (async :with-test)
+  (base_quickcheck :with-test)
+  (expect_test_helpers_core :with-test)))

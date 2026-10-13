@@ -15,8 +15,12 @@ depends: [
   "cryptokit"
   "zarith"
   "ppx_jane"
+  "core_unix"
   "money"
   "ledger"
+  "async" {with-test}
+  "base_quickcheck" {with-test}
+  "expect_test_helpers_core" {with-test}
   "odoc" {with-doc}
 ]
 build: [
