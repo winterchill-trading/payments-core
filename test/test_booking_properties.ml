@@ -12,7 +12,10 @@ let candidates : Transfer.Status.t list =
   ; Rejected AC01
   ; Failed Insufficient_funds
   ; Returned AC04
+  ; Returned FOCR
   ; Recall_requested DUPL
+  ; Timed_out
+  ; Reorged
   ; Recall_refused NOAS
   ; Recalled
   ; Cancelled
@@ -33,7 +36,10 @@ type case =
 let gen =
   let open Quickcheck.Generator.Let_syntax in
   let%bind direction = Quickcheck.Generator.of_list [ Transfer.Direction.In; Out ] in
-  let%bind rail = Quickcheck.Generator.of_list [ Rail.Sepa_credit; Sepa_instant; Intraledger ] in
+  let%bind rail =
+    Quickcheck.Generator.of_list
+      [ Rail.Sepa_credit; Sepa_instant; Intraledger; Onchain Bitcoin ]
+  in
   let%bind amount_cents = Int.gen_incl 1 10_000 in
   let%bind fee_cents =
     Quickcheck.Generator.weighted_union [ 1., return 0; 2., Int.gen_incl 1 (min 200 amount_cents) ]
@@ -46,9 +52,31 @@ let gen =
 
 let cents n = Money.Amount.of_minor_units_int Money.Currency.eur n
 
-let details_for (rail : Rail.t) =
+let travel_rule : Travel_rule.t =
+  { originator =
+      { name = "Customer One"
+      ; account = "customer:1"
+      ; identification = Some (Customer_number "c-1")
+      ; lei = None
+      }
+  ; beneficiary =
+      { name = "Ada Example"; account = "bc1q-example"; identification = None; lei = None }
+  ; counterparty_wallet = Hosted { provider_name = "Example Exchange"; provider_lei = None }
+  }
+;;
+
+let details_for (rail : Rail.t) : Transfer.Details.t option =
   match rail with
   | Sepa_credit | Sepa_instant -> Some (sepa_details ())
+  | Onchain _ ->
+    Some
+      (Onchain
+         { travel_rule = Some travel_rule
+         ; tx_hash = None
+         ; block_hash = None
+         ; confirmations = 0
+         ; finalized = false
+         })
   | _ -> None
 ;;
 
@@ -82,6 +110,7 @@ let start case =
     let raw =
       match case.rail with
       | Intraledger -> "customer:2/eur"
+      | Onchain _ -> "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4"
       | _ -> "DE89370400440532013000"
     in
     Transfer.draft
@@ -119,7 +148,7 @@ let held b (t : Transfer.t) =
 let check_invariants b (t : Transfer.t) =
   Ledger.Trial_balance.of_balances b |> Ledger.Trial_balance.check |> Or_error.ok_exn;
   match t.direction, t.status with
-  | Out, (Submitted | Pending) ->
+  | Out, (Submitted | Pending | Reorged) ->
     [%test_result: Money.Amount.t] (held b t) ~expect:(Transfer.total_debit t)
   | _ -> [%test_result: Money.Amount.t] (held b t) ~expect:(cents 0)
 ;;
@@ -134,7 +163,10 @@ let run case =
   in
   check_invariants b t;
   List.foldi case.choices ~init:(b, t) ~f:(fun i (b, t) choice ->
-    let next = List.filter candidates ~f:(Transfer.can_transition t) in
+    (* Candidates the state machine accepts here, reason codes included. *)
+    let next =
+      List.filter candidates ~f:(fun to_ -> Result.is_ok (Transfer.transition t ~to_ ~at:t0))
+    in
     if List.is_empty next
     then b, t
     else (

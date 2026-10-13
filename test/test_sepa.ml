@@ -100,10 +100,10 @@ let%expect_test "pacs.002 status reports drive the lifecycle" =
     |}]
 ;;
 
-let%expect_test "SCT Inst times out into an AB05 reject, which releases the hold" =
+let%expect_test "SCT Inst times out after 10 s, which releases the hold" =
   let t = submitted ~rail:Sepa_instant () in
-  print_s [%sexp (Transfer.check_inst_timeout t ~now:(at 20) |> Option.map ~f:(fun t -> t.status) : Transfer.Status.t option)];
-  let rejected = Transfer.check_inst_timeout t ~now:(at 21) |> Option.value_exn in
+  print_s [%sexp (Transfer.check_inst_timeout t ~now:(at 10) |> Option.map ~f:(fun t -> t.status) : Transfer.Status.t option)];
+  let rejected = Transfer.check_inst_timeout t ~now:(at 11) |> Option.value_exn in
   show rejected;
   let b = ledger () in
   let b =
@@ -121,10 +121,10 @@ let%expect_test "SCT Inst times out into an AB05 reject, which releases the hold
   let hold = Booking.transition chart b (draft ~rail:Sepa_instant ()) ~to_:Submitted ~event_id:"e1" ~at:(at 0) |> Or_error.ok_exn in
   let b = Booking.apply b hold |> Or_error.ok_exn in
   print_entries
-    (Booking.transition chart b t ~to_:rejected.status ~event_id:"e2" ~at:(at 21) |> Or_error.ok_exn);
+    (Booking.transition chart b t ~to_:rejected.status ~event_id:"e2" ~at:(at 11) |> Or_error.ok_exn);
   [%expect {|
     ()
-    ((status (Rejected AB05)) (last_status ()))
+    ((status Timed_out) (last_status ()))
     e2/release  (Hold_release transfer:tr-1)  ref=tr-1
       debit  customer:1/eur/pending                   25.50 EUR
       credit customer:1/eur                           25.50 EUR
@@ -152,7 +152,7 @@ let%expect_test "recalls: deadline per reason, refusal and acceptance" =
     (Error ("recall deadline passed" (deadline 2026-10-27)))
     (Ok ok)
     (Error
-     ("reason code not allowed by the rulebook" (scheme Sct) (use Recall)
+     ("reason code not allowed by the rulebook" (scheme Sct) (use Rfro)
       (reason AC04)))
     ((status (Recall_requested DUPL)) (last_status ()))
     ((status (Recall_refused NOAS)) (last_status ()))
@@ -193,7 +193,9 @@ let%expect_test "on-chain transfers carry travel-rule data" =
             ; counterparty_wallet = wallet
             }
       ; tx_hash = None
+      ; block_hash = None
       ; confirmations = 0
+      ; finalized = false
       }
   in
   ok_or_error (draft ());
@@ -206,6 +208,42 @@ let%expect_test "on-chain transfers carry travel-rule data" =
      ("self-hosted wallet ownership must be verified above the threshold"
       (eur_value ())))
     (Ok ok)
+    (Ok ok)
+    |}]
+;;
+
+let%expect_test "SCT Inst: ACCP settles; a late ACCP after the time-out is a fresh debit" =
+  let t = submitted ~rail:Sepa_instant () in
+  show (Transfer.apply_status_report t ACCP ~at:(at 2) () |> Or_error.ok_exn);
+  let timed_out = Transfer.check_inst_timeout t ~now:(at 11) |> Option.value_exn in
+  let late = Transfer.apply_status_report timed_out ACCP ~at:(at 30) () |> Or_error.ok_exn in
+  show late;
+  let b = ledger () in
+  let fund =
+    Transfer.incoming ~id:(Transfer.Id.of_string "in") ~rail:Sepa_instant ~account:customer
+      ~details:(sepa_details ()) ~from:(External { name = "x"; detail = "y" })
+      ~amount:(eur "50.00") ~status:Settled ~now:t0 ()
+    |> Or_error.ok_exn
+  in
+  let b = Booking.apply b (Booking.created chart b fund ~event_id:"in" ~at:t0 |> Or_error.ok_exn) |> Or_error.ok_exn in
+  print_entries (Booking.transition chart b timed_out ~to_:Settled ~event_id:"late" ~at:(at 30) |> Or_error.ok_exn);
+  (* no returns on SCT Inst, only the FOCR answer to a recall *)
+  let settled = Transfer.apply_status_report t ACCP ~at:(at 2) () |> Or_error.ok_exn in
+  ok_or_error (Transfer.transition settled ~to_:(Returned AC04) ~at:(at 60));
+  let recall = Transfer.request_recall settled ~reason:TECH ~at:(at 60) |> Or_error.ok_exn in
+  ok_or_error (Transfer.transition recall ~to_:(Returned FOCR) ~at:(at 90));
+  [%expect {|
+    ((status Settled) (last_status (ACCP)))
+    ((status Settled) (last_status (ACCP)))
+    late/late-settlement  (Transfer late-settlement)  ref=tr-1
+      debit  customer:1/eur                           25.00 EUR
+      credit settlement:sepa_instant/EUR              25.00 EUR
+    late/fee  (Transfer fee)  ref=tr-1
+      debit  customer:1/eur                           0.50 EUR
+      credit income:fees/EUR                          0.50 EUR
+    (Error
+     ("transition not allowed" (transfer tr-1) (from Settled)
+      (to_ (Returned AC04)) (rail Sepa_instant)))
     (Ok ok)
     |}]
 ;;

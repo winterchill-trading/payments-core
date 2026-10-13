@@ -18,9 +18,11 @@ let%expect_test "allowed transitions table" =
   [%expect {|
     Draft         -> Awaiting_sca, Submitted, Cancelled, Failed
     Awaiting_sca  -> Submitted, Cancelled, Failed
-    Submitted     -> Pending, Settled, Rejected, Failed
-    Pending       -> Settled, Rejected, Failed
-    Settled       -> Returned, Recall_requested
+    Submitted     -> Pending, Settled, Rejected, Failed, Timed_out
+    Pending       -> Settled, Rejected, Failed, Timed_out, Reorged
+    Settled       -> Returned, Recall_requested, Reorged
+    Timed_out     -> Settled, Rejected
+    Reorged       -> Pending
     Recall_requested -> Recalled, Recall_refused, Returned
     Rejected      ->
     Failed        ->

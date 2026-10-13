@@ -24,8 +24,8 @@ let%expect_test "stable bin_prot digests" =
     Lightning.Target   3b138a460675950e7aa544c9dd14b78b
     Beneficiary        a75ca3f385560ca0ba4035db9d691422
     Sca.Challenge      e26e93362c39647d10d9b681eef48828
-    Transfer           fbe25fc0ad7cc9375ffa18fe0687578b
-    Standing_order     c9dbac8149ed6e35c0cea80f3a684d6a
+    Transfer           db8c7d038e225e9fe734377aee39ea79
+    Standing_order     39121335464084124a22220017780c99
     |}]
 ;;
 
@@ -49,7 +49,9 @@ let%expect_test "a transfer round trips through bin_prot and sexp" =
      (amount "25.00 EUR") (fee "0.50 EUR") (reference "invoice 42")
      (details
       (Sepa
-       ((payment_id ((end_to_end_id E2E-0001) (instruction_id ()) (uetr ())))
+       ((payment_id
+         ((end_to_end_id E2E-0001) (instruction_id ()) (uetr ()) (tx_id ())
+          (msg_id ()) (pmt_inf_id ())))
         (debtor
          ((name "Customer One") (iban DE77100100100123456789) (bic ())
           (address ())))
