@@ -28,13 +28,17 @@ module Chart : sig
     (** the institution's position at the payment network: an asset that may go
         negative *)
     ; fee_income : Money.Currency.t -> Ledger.Account_id.t
+    ; fx_position : Money.Currency.t -> Ledger.Account_id.t
+    (** the institution's inventory in a currency, the other side of swaps *)
     }
 
-  (** [settlement:<rail>/<currency>] and [income:fees/<currency>]. *)
+  (** [settlement:<rail>/<currency>], [income:fees/<currency>] and
+      [fx:position/<currency>]. *)
   val default : t
 
-  (** The accounts [default] names for these rails and currencies, ready to open:
-      settlement accounts are assets allowed to go negative, fee accounts are income. *)
+  (** The accounts a chart names for these rails and currencies, ready to open:
+      settlement and FX position accounts are assets allowed to go negative, fee
+      accounts are income. *)
   val accounts : t -> rails:Rail.t list -> currencies:Money.Currency.t list -> Ledger.Account.t list
 end
 

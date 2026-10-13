@@ -6,6 +6,7 @@ module Chart = struct
   type t =
     { settlement : Rail.t -> Money.Currency.t -> Account_id.t
     ; fee_income : Money.Currency.t -> Account_id.t
+    ; fx_position : Money.Currency.t -> Account_id.t
     }
 
   (* Rail.to_string has a ':' for on-chain rails ("onchain:bitcoin"); ids allow it. *)
@@ -17,12 +18,16 @@ module Chart = struct
     ; fee_income =
         (fun currency ->
           Account_id.of_string (sprintf "income:fees/%s" (Money.Currency.to_string currency)))
+    ; fx_position =
+        (fun currency ->
+          Account_id.of_string (sprintf "fx:position/%s" (Money.Currency.to_string currency)))
     }
   ;;
 
   let accounts t ~rails ~currencies =
     List.concat_map currencies ~f:(fun currency ->
       Ledger.Account.create (t.fee_income currency) Income
+      :: Ledger.Account.create ~allow_negative:true (t.fx_position currency) Asset
       :: List.map rails ~f:(fun rail ->
         Ledger.Account.create ~allow_negative:true (t.settlement rail currency) Asset))
     |> List.dedup_and_sort ~compare:(fun a b ->
