@@ -12,3 +12,4 @@ module Crypto_address = Crypto_address
 module Lightning = Lightning
 module Beneficiary = Beneficiary
 module Sca = Sca
+module Transfer = Transfer
