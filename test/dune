@@ -3,6 +3,7 @@
  (libraries
   payments-core
   core
+  core_unix
   async
   async_kernel
   zarith
