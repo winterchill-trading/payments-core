@@ -139,6 +139,12 @@ module Target = struct
         }
   [@@deriving bin_io, sexp, compare, equal, hash]
 
+  module Stable = struct
+    module V1 = struct
+      type nonrec t = t [@@deriving bin_io, sexp, compare, equal, hash]
+    end
+  end
+
   let lnurl s =
     match Bech32.decode ~max_length:Int.max_value s with
     | Some { hrp = "lnurl"; data; _ } ->

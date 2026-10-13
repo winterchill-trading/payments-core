@@ -34,6 +34,12 @@ module Target : sig
         }
   [@@deriving bin_io, sexp, compare, equal, hash]
 
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving bin_io, sexp, compare, equal, hash]
+    end
+  end
+
   (** Accepts an invoice, an [lnurl1...] string, a [user@domain] address, each with an
       optional [lightning:] URI prefix. *)
   val of_string : string -> t Or_error.t
