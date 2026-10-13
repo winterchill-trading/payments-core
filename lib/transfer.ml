@@ -37,6 +37,8 @@ module Status = struct
     | Recall_refused of Iso_reason.Stable.V1.t
     | Recalled
     | Cancelled
+    | Timed_out
+    | Reorged
   [@@deriving bin_io, sexp, compare, equal, hash]
 
   let name = function
@@ -52,20 +54,31 @@ module Status = struct
     | Recall_refused _ -> "Recall_refused"
     | Recalled -> "Recalled"
     | Cancelled -> "Cancelled"
+    | Timed_out -> "Timed_out"
+    | Reorged -> "Reorged"
   ;;
 
   let is_final = function
     | Rejected _ | Failed _ | Returned _ | Recall_refused _ | Recalled | Cancelled -> true
-    | Draft | Awaiting_sca | Submitted | Pending | Settled | Recall_requested _ -> false
+    | Draft
+    | Awaiting_sca
+    | Submitted
+    | Pending
+    | Settled
+    | Recall_requested _
+    | Timed_out
+    | Reorged -> false
   ;;
 end
 
 let allowed_transitions =
   [ "Draft", [ "Awaiting_sca"; "Submitted"; "Cancelled"; "Failed" ]
   ; "Awaiting_sca", [ "Submitted"; "Cancelled"; "Failed" ]
-  ; "Submitted", [ "Pending"; "Settled"; "Rejected"; "Failed" ]
-  ; "Pending", [ "Settled"; "Rejected"; "Failed" ]
-  ; "Settled", [ "Returned"; "Recall_requested" ]
+  ; "Submitted", [ "Pending"; "Settled"; "Rejected"; "Failed"; "Timed_out" ]
+  ; "Pending", [ "Settled"; "Rejected"; "Failed"; "Timed_out"; "Reorged" ]
+  ; "Settled", [ "Returned"; "Recall_requested"; "Reorged" ]
+  ; "Timed_out", [ "Settled"; "Rejected" ]
+  ; "Reorged", [ "Pending" ]
     (* A return can cross a recall in flight; it then answers it. *)
   ; "Recall_requested", [ "Recalled"; "Recall_refused"; "Returned" ]
   ; "Rejected", []
@@ -93,7 +106,9 @@ module Details = struct
     | Onchain of
         { travel_rule : Travel_rule.Stable.V1.t option
         ; tx_hash : string option
+        ; block_hash : string option
         ; confirmations : int
+        ; finalized : bool
         }
     | Lightning of
         { payment_hash : string option
@@ -162,7 +177,15 @@ let check_details ~(direction : Direction.t) ~rail ~amount ?creditor_iban ?eur_v
   | None, Some (Onchain { travel_rule = None; _ }), Onchain _ | None, None, Onchain _ ->
     (match direction with
      | Out -> Or_error.error_string "on-chain transfers need travel-rule data"
-     | In -> Ok (Details.Onchain { travel_rule = None; tx_hash = None; confirmations = 0 }))
+     | In ->
+       Ok
+         (Details.Onchain
+            { travel_rule = None
+            ; tx_hash = None
+            ; block_hash = None
+            ; confirmations = 0
+            ; finalized = false
+            }))
   | None, Some (Lightning _ as d), Lightning -> Ok d
   | None, None, Lightning -> Ok (Details.Lightning { payment_hash = None; preimage = None })
   | None, (Some Intraledger | None), Intraledger -> Ok Details.Intraledger
@@ -286,8 +309,19 @@ let by_table t (to_ : Status.t) =
 let can_transition t (to_ : Status.t) =
   by_table t to_
   &&
-  match to_ with
-  | Returned _ | Recall_requested _ | Recall_refused _ | Recalled -> Rail.is_returnable t.rail
+  match to_, t.rail with
+  (* SCT Inst has no returns after acceptance, only the FOCR answer to a recall. *)
+  | Returned _, Sepa_instant -> Status.name t.status |> String.equal "Recall_requested"
+  | (Returned _ | Recall_requested _ | Recall_refused _ | Recalled), rail ->
+    Rail.is_returnable rail
+  | Timed_out, rail -> Rail.equal rail Sepa_instant
+  (* An outgoing payment is settled at our confirmation threshold; a reorg after that
+     is a chain incident for operations, not a state that could capture the hold twice. *)
+  | Reorged, Onchain _ ->
+    (match t.direction, t.status with
+     | Out, Settled -> false
+     | _ -> true)
+  | Reorged, _ -> false
   | _ -> true
 ;;
 
@@ -299,7 +333,10 @@ let check_reason t (to_ : Status.t) =
     (match to_ with
      | Rejected r -> Sepa.check_reason scheme Reject r
      | Returned r -> Sepa.check_reason scheme Return r
-     | Recall_requested r -> Sepa.check_reason scheme Recall r
+     | Recall_requested r ->
+       (match Sepa.check_reason scheme Recall r with
+        | Ok () -> Ok ()
+        | Error _ -> Sepa.check_reason scheme Rfro r)
      | Recall_refused r -> Sepa.check_reason scheme Recall_refusal r
      | _ -> Ok ())
 ;;
@@ -340,6 +377,9 @@ let apply_status_report t (code : Iso20022.Transaction_status.t) ?reason ?value_
   let open Or_error.Let_syntax in
   let%bind (target : Status.t option) =
     match code, t.status with
+    (* SCT Inst confirms positively with ACCP. *)
+    | ACCP, (Submitted | Pending | Timed_out) when Rail.equal t.rail Sepa_instant ->
+      Ok (Some Status.Settled)
     | (RCVD | ACTC | ACCP), Submitted -> Ok None
     | (ACSP | ACWC | PDNG), Pending -> Ok None
     | (ACSP | ACWC | PDNG), _ -> Ok (Some Status.Pending)
@@ -370,7 +410,7 @@ let check_inst_timeout t ~now =
   match t.rail, t.status, t.details with
   | Sepa_instant, Submitted, Sepa { acceptance_time = Some acceptance_time; _ }
     when Sepa.Inst.timed_out ~acceptance_time ~now ->
-    transition t ~to_:(Rejected AB05) ~at:now |> Result.ok
+    transition t ~to_:Timed_out ~at:now |> Result.ok
   | _ -> None
 ;;
 
@@ -392,6 +432,43 @@ let request_recall t ~reason ~at =
     | _ -> Ok ()
   in
   transition t ~to_:(Recall_requested reason) ~at
+;;
+
+let settle_lightning t ~preimage ~at =
+  match t.details with
+  | Lightning { payment_hash = Some hash; _ } ->
+    let hex s = String.concat_map s ~f:(fun c -> sprintf "%02x" (Char.to_int c)) in
+    let bytes =
+      Option.try_with (fun () ->
+        String.init (String.length preimage / 2) ~f:(fun i ->
+          Char.of_int_exn (Int.of_string ("0x" ^ String.sub preimage ~pos:(2 * i) ~len:2))))
+    in
+    (match bytes with
+     | Some b
+       when String.length preimage = 64
+            && String.equal (hex (Cryptokit.hash_string (Cryptokit.Hash.sha256 ()) b)) hash ->
+       Or_error.map (transition t ~to_:Settled ~at) ~f:(fun t ->
+         { t with
+           details = Lightning { payment_hash = Some hash; preimage = Some (String.lowercase preimage) }
+         })
+     | _ -> Or_error.error_s [%message "preimage does not match the payment hash" hash])
+  | _ -> Or_error.error_string "no Lightning payment hash to check the preimage against"
+;;
+
+let record_confirmations t ~tx_hash ~block_hash ~confirmations ~finalized ?eur_value ~at () =
+  match t.details, t.rail with
+  | Onchain d, Onchain network ->
+    let t =
+      { t with
+        details = Onchain { d with tx_hash = Some tx_hash; block_hash = Some block_hash; confirmations; finalized }
+      }
+    in
+    let policy = Confirmation_policy.required network ~eur_value in
+    (match t.direction, t.status with
+     | In, Pending when Confirmation_policy.is_met policy ~confirmations ~finalized ->
+       transition t ~to_:Settled ~at
+     | _ -> Ok t)
+  | _ -> Or_error.error_string "not an on-chain transfer"
 ;;
 
 let is_terminal t =

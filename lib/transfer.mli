@@ -7,14 +7,19 @@
       │           │              │           │          └─> Recall_requested ─> Recalled
       │           │              │           │                      │      └──> Returned
       │           │              │           │                      └─> Recall_refused
-      │           │              └───────────┴─> Rejected (scheme reason code)
+      │           │              ├───────────┴─> Rejected (scheme reason code)
+      │           │              └─> Timed_out ─> Settled (late) | Rejected   (SCT Inst)
       └───────────┴─> Cancelled                  Failed (our side: funds, SCA, expiry)
     v}
 
     [Rejected], [Returned], [Recall_requested] and [Recall_refused] carry ISO 20022
     reason codes; on SEPA rails the code must be one the rulebook allows for that use
-    ({!Sepa.check_reason}). Returns and recalls exist only on returnable rails. Incoming
-    transfers start at [Pending] or [Settled]. Every transition is timestamped.
+    ({!Sepa.check_reason}). Returns and recalls exist only on returnable rails, and SCT
+    Inst has no returns except the [FOCR] answer to a recall. [Timed_out] exists only on
+    SCT Inst; [Reorged] only on-chain (Pending or Settled -> Reorged -> Pending, when a
+    block is orphaned and the transaction must confirm again; outgoing transfers only
+    from Pending, while the hold is still open). Incoming transfers start
+    at [Pending] or [Settled]. Every transition is timestamped.
 
     Rail-specific data lives in {!Details}: the pacs.008 fields for SEPA, the travel-rule
     record for on-chain transfers, the payment hash for Lightning. *)
@@ -54,6 +59,10 @@ module Status : sig
     | Recall_refused of Iso_reason.Stable.V1.t
     | Recalled (** the recall was accepted and the funds came back ([FOCR]) *)
     | Cancelled
+    | Timed_out
+    (** SCT Inst: no confirmation within {!Sepa.Inst.timeout}; the payer's account is
+        restored, but a late settlement can still arrive *)
+    | Reorged (** on-chain: the block holding the transaction was orphaned *)
   [@@deriving bin_io, sexp, compare, equal, hash]
 
   (** No transition leaves this status, whatever the rail. *)
@@ -83,7 +92,9 @@ module Details : sig
     | Onchain of
         { travel_rule : Travel_rule.Stable.V1.t option
         ; tx_hash : string option
+        ; block_hash : string option
         ; confirmations : int
+        ; finalized : bool
         }
     | Lightning of
         { payment_hash : string option
@@ -196,12 +207,30 @@ val apply_status_report
   -> t Or_error.t
 
 (** SCT Inst: a submitted transfer without a confirmation after {!Sepa.Inst.timeout}
-    is rejected with [AB05]. [None] when nothing changes. *)
+    becomes [Timed_out]. [None] when nothing changes. *)
 val check_inst_timeout : t -> now:Time_ns.t -> t option
 
 (** [Recall_requested reason], checked against the rulebook deadline for the reason
     (counted from the settlement date in UTC). *)
 val request_recall : t -> reason:Iso_reason.t -> at:Time_ns.t -> t Or_error.t
+
+(** Lightning: settles an outgoing payment on the preimage whose SHA-256 is the
+    invoice's payment hash, and keeps it as proof of payment. *)
+val settle_lightning : t -> preimage:string -> at:Time_ns.t -> t Or_error.t
+
+(** On-chain: records the confirmation count (and whether the block is finalized) for
+    the transaction [tx_hash] in [block_hash]. An incoming [Pending] transfer settles once
+    {!Confirmation_policy.required} is met; [eur_value] is its EUR value for the policy. *)
+val record_confirmations
+  :  t
+  -> tx_hash:string
+  -> block_hash:string
+  -> confirmations:int
+  -> finalized:bool
+  -> ?eur_value:Money.Amount.t
+  -> at:Time_ns.t
+  -> unit
+  -> t Or_error.t
 
 (** No further transition is possible on this transfer's rail. *)
 val is_terminal : t -> bool
