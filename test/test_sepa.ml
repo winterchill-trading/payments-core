@@ -158,7 +158,7 @@ let%expect_test "SCT Inst times out after 10 s, which releases the hold" =
     {|
     ()
     ((status Timed_out) (last_status ()))
-    e2/release  (Hold_release transfer:tr-1)  ref=tr-1
+    e2/release  HOLD  (Hold_release transfer:tr-1)  ref=tr-1
       debit  customer:1/eur/pending                   25.50 EUR
       credit customer:1/eur                           25.50 EUR
     |}]
@@ -313,10 +313,10 @@ let%expect_test "SCT Inst: ACCP settles; a late ACCP after the time-out is a fre
     {|
     ((status Settled) (last_status (ACCP)))
     ((status Settled) (last_status (ACCP)))
-    late/late-settlement  (Transfer late-settlement)  ref=tr-1
+    late/late-settlement  WITHDRAWAL  (Transfer late-settlement)  ref=tr-1  sca=(Exemption"Art 16 Low_value_remote")
       debit  customer:1/eur                           25.00 EUR
       credit settlement:sepa_instant/EUR              25.00 EUR
-    late/fee  (Transfer fee)  ref=tr-1
+    late/fee  FEE  (Transfer fee)  ref=tr-1  sca=(Exemption"Art 16 Low_value_remote")
       debit  customer:1/eur                           0.50 EUR
       credit income:fees/EUR                          0.50 EUR
     (Error

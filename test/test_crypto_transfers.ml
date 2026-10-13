@@ -96,25 +96,25 @@ let%expect_test "a deposit settles at 3 confirmations, is taken back on a reorg 
     {|
     (status Pending)
     (status Settled)
-    ev-2/deposit  (Transfer deposit)  ref=dep-1
+    ev-2/deposit  DEPOSIT  (Transfer deposit)  ref=dep-1
       debit  settlement:onchain:bitcoin/BTC           0.01000000 BTC
       credit customer:1/btc                           0.01000000 BTC
-    ev-2/fee  (Transfer fee)  ref=dep-1
+    ev-2/fee  FEE  (Transfer fee)  ref=dep-1
       debit  customer:1/btc                           0.00001000 BTC
       credit income:fees/BTC                          0.00001000 BTC
     (status Reorged)
-    ev-3/reorg-fee-refund  (Transfer reorg-fee-refund)  ref=dep-1
+    ev-3/reorg-fee-refund  REFUND  (Transfer reorg-fee-refund)  ref=dep-1
       debit  income:fees/BTC                          0.00001000 BTC
       credit customer:1/btc                           0.00001000 BTC
-    ev-3/reorg  (Transfer reorg)  ref=dep-1
+    ev-3/reorg  REVERSAL  (Transfer reorg)  ref=dep-1
       debit  customer:1/btc                           0.01000000 BTC
       credit settlement:onchain:bitcoin/BTC           0.01000000 BTC
     (status Pending)
     (status Settled)
-    ev-5/deposit  (Transfer deposit)  ref=dep-1
+    ev-5/deposit  DEPOSIT  (Transfer deposit)  ref=dep-1
       debit  settlement:onchain:bitcoin/BTC           0.01000000 BTC
       credit customer:1/btc                           0.01000000 BTC
-    ev-5/fee  (Transfer fee)  ref=dep-1
+    ev-5/fee  FEE  (Transfer fee)  ref=dep-1
       debit  customer:1/btc                           0.00001000 BTC
       credit income:fees/BTC                          0.00001000 BTC
     |}]

@@ -87,13 +87,13 @@ let%expect_test "EUR to BTC with spread and fee" =
     {|
     (quote (sell "100.00 EUR") (fee "0.50 EUR") (buy "0.00164175 BTC")
      (effective_price 0.0000164175))
-    swap-evt-1/swap-sell  (Transfer swap-sell)  ref=q-1
+    swap-evt-1/swap-sell  FX_LEG  (Transfer swap-sell)  ref=q-1
       debit  customer:1/eur                           99.50 EUR
       credit fx:position/EUR                          99.50 EUR
-    swap-evt-1/swap-fee  (Transfer swap-fee)  ref=q-1
+    swap-evt-1/swap-fee  FEE  (Transfer swap-fee)  ref=q-1
       debit  customer:1/eur                           0.50 EUR
       credit income:fees/EUR                          0.50 EUR
-    swap-evt-1/swap-buy  (Transfer swap-buy)  ref=q-1
+    swap-evt-1/swap-buy  FX_LEG  (Transfer swap-buy)  ref=q-1
       debit  fx:position/BTC                          0.00164175 BTC
       credit customer:1/btc                           0.00164175 BTC
     (after (eur "50.00 EUR") (btc "0.00164175 BTC"))

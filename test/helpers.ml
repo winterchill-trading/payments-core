@@ -77,10 +77,14 @@ let ledger ?(currencies = [ Money.Currency.eur ]) ?(customers = [ customer ]) ()
 let print_entries entries =
   List.iter entries ~f:(fun (e : Ledger.Entry.t) ->
     printf
-      "%s  %s  ref=%s\n"
+      "%s  %s  %s  ref=%s%s\n"
       (Ledger.Idempotency_key.to_string e.idempotency_key)
+      (Ledger.Entry.Code.to_string e.code)
       (Sexp.to_string [%sexp (e.kind : Ledger.Entry.Kind.t)])
-      e.reference;
+      e.reference
+      (match e.sca with
+       | None -> ""
+       | Some sca -> "  sca=" ^ Sexp.to_string [%sexp (sca : Ledger.Sca_evidence.t)]);
     List.iter e.postings ~f:(fun p ->
       printf
         "  %-6s %-40s %s\n"
