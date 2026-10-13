@@ -64,16 +64,48 @@ let build balances legs =
 
 let key ~event_id leg = Ledger.Idempotency_key.of_string_or_error (event_id ^ "/" ^ leg)
 
-let transfer_entry ~tag ~event_id ~(t : Transfer.t) ~at ~debit ~credit amount _balances =
+(* How the payment was authorised, kept on the entry for the PSD2 art. 74(2) trail. *)
+let sca_evidence (t : Transfer.t) : Ledger.Sca_evidence.t option =
+  match t.authorization with
+  | None -> None
+  | Some (Sca id) -> Some (Challenge (Sca.Id.to_string id))
+  | Some (Exempt e) ->
+    Some
+      (Exemption
+         (sprintf
+            "%s %s"
+            (Sca.Exemption.article e)
+            (Sexp.to_string [%sexp (e : Sca.Exemption.t)])))
+;;
+
+let transfer_entry
+  ~tag
+  ~code
+  ~event_id
+  ~(t : Transfer.t)
+  ~at
+  ~debit
+  ~credit
+  amount
+  _balances
+  =
   let open Or_error.Let_syntax in
   let%bind idempotency_key = key ~event_id tag in
   Ledger.Entry.create
     ~idempotency_key
     ~kind:(Transfer tag)
+    ~code
+    ?sca:(sca_evidence t)
     ~reference:(Transfer.Id.to_string t.id)
     ~effective_at:at
     ~recorded_at:at
     [ Ledger.Posting.debit debit amount; Ledger.Posting.credit credit amount ]
+;;
+
+let withdrawal_code (t : Transfer.t) : Ledger.Entry.Code.t =
+  match t.rail with
+  | Intraledger -> Transfer_intraledger
+  | _ -> Withdrawal
 ;;
 
 let place ~event_id ~(t : Transfer.t) ~at balances =
@@ -85,21 +117,25 @@ let place ~event_id ~(t : Transfer.t) ~at balances =
     ~account:t.account
     ~amount:(Transfer.total_debit t)
     ~idempotency_key
+    ~code:(withdrawal_code t)
     ~reference:(Transfer.Id.to_string t.id)
     ~effective_at:at
     ~recorded_at:at
     ()
 ;;
 
-let capture ~leg ~to_ ~amount ~event_id ~(t : Transfer.t) ~at balances =
+(* One entry pays the network and the fee account from the hold, so the two can never be
+   half-booked; any remainder (none for a full settlement) is released with it. *)
+let capture_split ~payees ~event_id ~(t : Transfer.t) ~at balances =
   let open Or_error.Let_syntax in
-  let%bind idempotency_key = key ~event_id leg in
-  Ledger.Hold.capture
+  let%bind idempotency_key = key ~event_id "capture" in
+  Ledger.Hold.capture_split
     balances
     ~hold_id:(hold_id t)
-    ~amount
-    ~to_
+    ~release_remainder:true
+    payees
     ~idempotency_key
+    ~code:(withdrawal_code t)
     ~reference:(Transfer.Id.to_string t.id)
     ~effective_at:at
     ~recorded_at:at
@@ -126,6 +162,7 @@ let fee_legs (t : Transfer.t) leg = if Amount.is_zero t.fee then [] else [ leg ]
 let deposit_legs chart ~event_id ~(t : Transfer.t) ~at =
   transfer_entry
     ~tag:"deposit"
+    ~code:Deposit
     ~event_id
     ~t
     ~at
@@ -136,6 +173,7 @@ let deposit_legs chart ~event_id ~(t : Transfer.t) ~at =
        t
        (transfer_entry
           ~tag:"fee"
+          ~code:Fee
           ~event_id
           ~t
           ~at
@@ -144,20 +182,23 @@ let deposit_legs chart ~event_id ~(t : Transfer.t) ~at =
           t.fee)
 ;;
 
+let return_code : Transfer.Status.t -> Ledger.Entry.Code.t = function
+  | Recalled -> Recall
+  | _ -> Return
+;;
+
 let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_id ~at =
   match t.direction, t.status, to_ with
   | Out, (Draft | Awaiting_sca), Submitted -> [ place ~event_id ~t ~at ]
   | Out, (Submitted | Pending), Settled ->
-    capture ~leg:"capture" ~to_:(settlement chart t) ~amount:t.amount ~event_id ~t ~at
-    :: fee_legs
-         t
-         (capture
-            ~leg:"fee"
-            ~to_:(chart.fee_income (currency t))
-            ~amount:t.fee
-            ~event_id
-            ~t
-            ~at)
+    [ capture_split
+        ~payees:
+          ((settlement chart t, t.amount)
+           :: fee_legs t (chart.fee_income (currency t), t.fee))
+        ~event_id
+        ~t
+        ~at
+    ]
   | Out, (Submitted | Pending), (Failed _ | Rejected _ | Timed_out) ->
     [ release ~event_id ~t ~at ]
   (* A settlement confirmed after the SCT Inst time-out: the hold is gone, so the payment
@@ -166,6 +207,7 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
   | Out, Timed_out, Settled ->
     transfer_entry
       ~tag:"late-settlement"
+      ~code:(withdrawal_code t)
       ~event_id
       ~t
       ~at
@@ -176,6 +218,7 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
          t
          (transfer_entry
             ~tag:"fee"
+            ~code:Fee
             ~event_id
             ~t
             ~at
@@ -185,6 +228,7 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
   | Out, (Settled | Recall_requested _), (Returned _ | Recalled) ->
     [ transfer_entry
         ~tag:"return"
+        ~code:(return_code to_)
         ~event_id
         ~t
         ~at
@@ -200,6 +244,7 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
       t
       (transfer_entry
          ~tag:"reorg-fee-refund"
+         ~code:Refund
          ~event_id
          ~t
          ~at
@@ -208,6 +253,7 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
          t.fee)
     @ [ transfer_entry
           ~tag:"reorg"
+          ~code:Reversal
           ~event_id
           ~t
           ~at
@@ -223,6 +269,7 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
       t
       (transfer_entry
          ~tag:"fee-refund"
+         ~code:Refund
          ~event_id
          ~t
          ~at
@@ -231,6 +278,7 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
          t.fee)
     @ [ transfer_entry
           ~tag:"return"
+          ~code:(return_code to_)
           ~event_id
           ~t
           ~at
@@ -261,9 +309,5 @@ let created chart balances (t : Transfer.t) ~event_id ~at =
   | _ -> Ok []
 ;;
 
-(* Stops at the first failure: later legs were built assuming the earlier ones booked. *)
-let post journal entries =
-  List.fold_result entries ~init:[] ~f:(fun acc entry ->
-    Or_error.map (Ledger.Journal.append_entry journal entry) ~f:(fun r -> r :: acc))
-  |> Or_error.map ~f:List.rev
-;;
+(* One linked record: the legs of a transition book together or not at all. *)
+let post journal entries = Ledger.Journal.append_linked journal entries

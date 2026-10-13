@@ -18,6 +18,10 @@
     refund that fee and send the amount back; so does [Reorged] after the deposit was
     credited (it is credited again when it re-confirms).
 
+    Entries carry a ledger {!Ledger.Entry.Code.t} ([Withdrawal], [Deposit], [Fee],
+    [Return], [Recall], [Refund], [Reversal]) and, where the ledger accepts it, the SCA
+    challenge or exemption that authorised the payment.
+
     Every entry has the transfer id as [reference] and [<event id>/<leg>] as its
     idempotency key, where the event id is the provider event that caused the transition,
     so a webhook delivered twice is booked once. *)
@@ -75,8 +79,9 @@ val created
 (** Applies entries to balances in order, as a journal would. *)
 val apply : Ledger.Balances.t -> Ledger.Entry.t list -> Ledger.Balances.t Or_error.t
 
-(** Appends entries to a journal in order. A replayed event returns [Duplicate]s. *)
+(** Appends a transition's entries to a journal as one linked record, all or none. A
+    replayed event returns [Duplicate]. *)
 val post
   :  Ledger.Journal.t
   -> Ledger.Entry.t list
-  -> Ledger.Journal.Append_result.t list Or_error.t
+  -> Ledger.Journal.Append_result.t Or_error.t
