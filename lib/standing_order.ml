@@ -163,7 +163,7 @@ let run t ~now ~zone =
     let id = Transfer.Id.of_string (sprintf "%s:%s" (Id.to_string t.id) (Date.to_string run_date)) in
     let open Or_error.Let_syntax in
     let%bind details = details_for_run ~id:t.id ~run_date t.details in
-    let%map draft =
+    let%bind draft =
       Transfer.draft
         ?details
         ~id
@@ -175,11 +175,19 @@ let run t ~now ~zone =
         ~now
         ()
     in
+    (* RTS art. 14: SCA for the first payment of a series with the same amount and
+       payee; later runs are exempt. *)
+    let%bind draft =
+      if t.runs >= 1
+      then Transfer.exempt draft ~exemption:Recurring_same_amount_payee
+      else Ok draft
+    in
     let next_run = Schedule.next_after t.schedule today in
     let status : Status.t = if past_until t next_run then Finished else Active in
-    Some
-      ( { t with next_run; status; runs = t.runs + 1; last_run = Some run_date }
-      , draft ))
+    return
+      (Some
+         ( { t with next_run; status; runs = t.runs + 1; last_run = Some run_date }
+         , draft )))
 ;;
 
 let poll t ~time_source ~zone =

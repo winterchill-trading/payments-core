@@ -83,7 +83,8 @@ val cancel : t -> t
 
 val is_due : t -> now:Time_ns.t -> zone:Time_float.Zone.t -> bool
 
-(** [None] when not due. The draft's id is [<order id>:<run date>], so running the same
+(** [None] when not due. The first run's draft needs SCA; later drafts carry the
+    recurring-payment exemption (RTS art. 14). The draft's id is [<order id>:<run date>], so running the same
     date twice (a retry) yields the same transfer id for the caller to de-duplicate. *)
 val run
   :  t
