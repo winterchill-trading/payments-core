@@ -5,3 +5,4 @@ module Rail = Rail
 module Iban = Iban
 module Bic = Bic
 module Base58 = Base58
+module Bech32 = Bech32
