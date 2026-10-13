@@ -2,15 +2,22 @@
     account), with its lifecycle.
 
     {v
-    Draft ──> Awaiting_sca ──> Submitted ──> Pending ──> Settled ──> Returned
-      │            │               │            │
-      └────────────┴──> Cancelled  └────────────┴──> Failed
+    Draft ─> Awaiting_sca ─> Submitted ─> Pending ─> Settled ─> Returned
+      │           │              │           │          │
+      │           │              │           │          └─> Recall_requested ─> Recalled
+      │           │              │           │                      │      └──> Returned
+      │           │              │           │                      └─> Recall_refused
+      │           │              └───────────┴─> Rejected (scheme reason code)
+      └───────────┴─> Cancelled                  Failed (our side: funds, SCA, expiry)
     v}
 
-    Draft and Awaiting_sca can also fail (an SCA lockout, a rejected beneficiary).
-    Incoming transfers start at [Pending] or [Settled]. Only rails where payments can
-    come back ({!Rail.is_returnable}) allow [Settled -> Returned]. Every transition is
-    timestamped in [history]. *)
+    [Rejected], [Returned], [Recall_requested] and [Recall_refused] carry ISO 20022
+    reason codes; on SEPA rails the code must be one the rulebook allows for that use
+    ({!Sepa.check_reason}). Returns and recalls exist only on returnable rails. Incoming
+    transfers start at [Pending] or [Settled]. Every transition is timestamped.
+
+    Rail-specific data lives in {!Details}: the pacs.008 fields for SEPA, the travel-rule
+    record for on-chain transfers, the payment hash for Lightning. *)
 
 open! Core
 
@@ -24,12 +31,12 @@ module Direction : sig
 end
 
 module Failure_reason : sig
+  (** Failures on our side, before or outside the scheme. *)
   type t =
     | Insufficient_funds
     | Sca_failed
-    | Beneficiary_rejected (** the receiving side refused or does not exist *)
     | Expired (** e.g. a Lightning invoice ran out before payment *)
-    | Provider_rejected of string
+    | Provider_error of string (** the provider refused the request itself *)
   [@@deriving bin_io, sexp, compare, equal, hash]
 end
 
@@ -40,29 +47,50 @@ module Status : sig
     | Submitted
     | Pending
     | Settled
+    | Rejected of Iso_reason.Stable.V1.t
     | Failed of Failure_reason.t
-    | Returned
+    | Returned of Iso_reason.Stable.V1.t
+    | Recall_requested of Iso_reason.Stable.V1.t
+    | Recall_refused of Iso_reason.Stable.V1.t
+    | Recalled (** the recall was accepted and the funds came back ([FOCR]) *)
     | Cancelled
   [@@deriving bin_io, sexp, compare, equal, hash]
 
-  (** Settled is not terminal on returnable rails; see {!Transfer.is_terminal}. *)
+  (** No transition leaves this status, whatever the rail. *)
   val is_final : t -> bool
 
   (** The constructor name, for tables and logs. *)
   val name : t -> string
 end
 
-(** Every allowed [(from, to)] pair by constructor name, ignoring the rail. *)
+(** Every allowed [(from, to)] pair by constructor name, before rail restrictions. *)
 val allowed_transitions : (string * string list) list
 
 module Counterparty : sig
   type t =
-    | Beneficiary of Beneficiary.t (** outgoing: who we pay *)
+    | Beneficiary of Beneficiary.Stable.V1.t (** outgoing: who we pay *)
     | External of
         { name : string
         ; detail : string (** IBAN, address or invoice the funds came from *)
         }
     (** incoming: who paid us, as reported *)
+  [@@deriving bin_io, sexp, compare, equal]
+end
+
+module Details : sig
+  type t =
+    | Sepa of Sepa.Details.Stable.V1.t
+    | Onchain of
+        { travel_rule : Travel_rule.Stable.V1.t option
+        ; tx_hash : string option
+        ; confirmations : int
+        }
+    | Lightning of
+        { payment_hash : string option
+        ; preimage : string option (** proof of payment, once settled *)
+        }
+    | Intraledger
+    | Card
   [@@deriving bin_io, sexp, compare, equal]
 end
 
@@ -77,7 +105,8 @@ module Stable : sig
       ; counterparty : Counterparty.t
       ; amount : Money.Amount.Stable.V1.t (** positive, what the counterparty receives *)
       ; fee : Money.Amount.Stable.V1.t (** same currency, zero when free *)
-      ; reference : string (** remittance information shown to both sides *)
+      ; reference : string (** free text shown to the customer *)
+      ; details : Details.t
       ; status : Status.t
       ; history : (Status.t * Utc_time.Stable.V1.t) list (** newest first *)
       ; sca : Sca.Id.Stable.V1.t option
@@ -96,6 +125,7 @@ type t = Stable.V1.t =
   ; amount : Money.Amount.t
   ; fee : Money.Amount.t
   ; reference : string
+  ; details : Details.t
   ; status : Status.t
   ; history : (Status.t * Time_ns.t) list
   ; sca : Sca.Id.t option
@@ -104,7 +134,11 @@ type t = Stable.V1.t =
 [@@deriving sexp, compare, equal]
 
 (** An outgoing draft. Fails on a non-positive amount, a negative fee or one in another
-    currency, or a beneficiary the rail cannot reach. *)
+    currency, a beneficiary the rail cannot reach, or details that do not fit the rail:
+    SEPA rails need valid {!Sepa.Details} whose creditor IBAN is the beneficiary's;
+    on-chain transfers need a travel-rule record that passes {!Travel_rule.check}
+    ([eur_value] is the amount's EUR value for the self-hosted wallet threshold). Other
+    rails get their details filled in when omitted. *)
 val draft
   :  id:Id.t
   -> rail:Rail.t
@@ -113,12 +147,14 @@ val draft
   -> amount:Money.Amount.t
   -> ?fee:Money.Amount.t
   -> ?reference:string
+  -> ?details:Details.t
+  -> ?eur_value:Money.Amount.t
   -> now:Time_ns.t
   -> unit
   -> t Or_error.t
 
 (** An incoming payment as first reported: [Pending] or [Settled]. Fails like {!draft}
-    on amounts, and when the fee exceeds the amount. *)
+    on amounts and details, and when the fee exceeds the amount. *)
 val incoming
   :  id:Id.t
   -> rail:Rail.t
@@ -127,6 +163,7 @@ val incoming
   -> amount:Money.Amount.t
   -> ?fee:Money.Amount.t
   -> ?reference:string
+  -> ?details:Details.t
   -> ?provider_ref:string
   -> status:Status.t
   -> now:Time_ns.t
@@ -135,12 +172,36 @@ val incoming
 
 val can_transition : t -> Status.t -> bool
 
-(** Moves to [to_] if the table and the rail allow it. Repeating the current status is an
-    error, so callers notice a duplicate event instead of stamping it twice. *)
+(** Moves to [to_] if the table, the rail and (on SEPA rails) the rulebook's reason
+    codes allow it. Repeating the current status is an error, so callers notice a
+    duplicate event instead of stamping it twice. *)
 val transition : t -> to_:Status.t -> at:Time_ns.t -> t Or_error.t
 
 val require_sca : t -> challenge:Sca.Id.t -> at:Time_ns.t -> t Or_error.t
+
+(** Submits; for SEPA the acceptance time stamp is set to [at]. *)
 val submit : t -> ?provider_ref:string -> at:Time_ns.t -> unit -> t Or_error.t
+
+(** Applies a pacs.002 status report: [RCVD]/[ACTC]/[ACCP] keep [Submitted],
+    [ACSP]/[ACWC]/[PDNG] move to [Pending], [ACSC]/[ACCC] to [Settled], [RJCT] to
+    [Rejected reason] ([reason] is then required). A report that does not change the
+    status only records [last_status]. *)
+val apply_status_report
+  :  t
+  -> Iso20022.Transaction_status.t
+  -> ?reason:Iso_reason.t
+  -> ?value_date:Date.t
+  -> at:Time_ns.t
+  -> unit
+  -> t Or_error.t
+
+(** SCT Inst: a submitted transfer without a confirmation after {!Sepa.Inst.timeout}
+    is rejected with [AB05]. [None] when nothing changes. *)
+val check_inst_timeout : t -> now:Time_ns.t -> t option
+
+(** [Recall_requested reason], checked against the rulebook deadline for the reason
+    (counted from the settlement date in UTC). *)
+val request_recall : t -> reason:Iso_reason.t -> at:Time_ns.t -> t Or_error.t
 
 (** No further transition is possible on this transfer's rail. *)
 val is_terminal : t -> bool
@@ -148,5 +209,5 @@ val is_terminal : t -> bool
 (** [amount + fee]: what leaves the customer account on an outgoing transfer. *)
 val total_debit : t -> Money.Amount.t
 
-(** When the transfer entered [status], if it did. *)
-val entered_at : t -> Status.t -> Time_ns.t option
+(** When the transfer first entered a status with this constructor name. *)
+val entered_at : t -> string -> Time_ns.t option

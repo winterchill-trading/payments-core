@@ -7,13 +7,14 @@
       longer available but still posted;
     - [Settled]: the hold is captured, [amount] to the rail's settlement account and
       [fee] to fee income (two entries, so the fee shows as its own line);
-    - [Failed] after submission: the hold is released;
-    - [Returned]: the amount comes back from the settlement account. The fee is kept,
-      as a returned payment was still executed.
+    - [Rejected] or [Failed] after submission: the hold is released;
+    - [Returned] or [Recalled]: the amount comes back from the settlement account. The
+      fee is kept, as the payment was still executed. A recall request or refusal
+      moves no money.
 
     Incoming transfer, when it settles: the settlement account pays the customer
     account, then the fee (if any) moves from the customer to fee income. [Returned]
-    refunds that fee and sends the amount back.
+    and [Recalled] refund that fee and send the amount back.
 
     Every entry has the transfer id as [reference] and [<event id>/<leg>] as its
     idempotency key, where the event id is the provider event that caused the transition,

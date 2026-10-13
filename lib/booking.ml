@@ -154,8 +154,8 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
             ~event_id
             ~t
             ~at)
-  | Out, (Submitted | Pending), Failed _ -> [ release ~event_id ~t ~at ]
-  | Out, Settled, Returned ->
+  | Out, (Submitted | Pending), (Failed _ | Rejected _) -> [ release ~event_id ~t ~at ]
+  | Out, (Settled | Recall_requested _), (Returned _ | Recalled) ->
     [ transfer_entry
         ~tag:"return"
         ~event_id
@@ -166,7 +166,7 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
         t.amount
     ]
   | In, Pending, Settled -> deposit_legs chart ~event_id ~t ~at
-  | In, Settled, Returned ->
+  | In, (Settled | Recall_requested _), (Returned _ | Recalled) ->
     (* Sending an incoming payment back undoes it, so the fee charged on arrival is
        refunded first; otherwise a customer who received exactly the amount could not
        cover the return. *)
@@ -190,7 +190,7 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
         t.amount
     ]
   (* Every other allowed transition moves no money: entering Awaiting_sca or Pending,
-     or giving up before the hold was placed. *)
+     giving up before the hold was placed, or a recall being requested or refused. *)
   | _ -> []
 ;;
 
