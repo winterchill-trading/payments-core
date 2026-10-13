@@ -66,3 +66,21 @@ val to_code : t -> string
 val of_code : string -> t Or_error.t
 
 val description : t -> string
+
+module Kind : sig
+  (** Where a code may appear (EPC135-18 / EPC059-18 v6.0). *)
+  type t =
+    | Reject
+    | Return
+    | Recall
+    | Rfro (** request for recall by the originator *)
+    | Answer (** answer to a recall or RFRO *)
+  [@@deriving sexp, compare, equal, enumerate]
+end
+
+(** Uses the rulebooks allow for this code; empty for [Other] and retired codes. *)
+val kinds : t -> Kind.t list
+
+(** The customer can fix it (wrong, closed or blocked account, missing address,
+    deceased or refusing beneficiary), as opposed to a bank or scheme problem. *)
+val is_customer_error : t -> bool

@@ -115,3 +115,31 @@ let description = function
   | Other code -> "Unlisted reason " ^ code
   | t -> List.Assoc.find_exn table t ~equal
 ;;
+
+module Kind = struct
+  type t =
+    | Reject
+    | Return
+    | Recall
+    | Rfro
+    | Answer
+  [@@deriving sexp, compare, equal, enumerate]
+end
+
+let kinds : t -> Kind.t list = function
+  | AB05 | AB06 | AB07 | AB08 | AB09 | AB10 | AM23 | CNOR | DNOR | FF01 | TM01 -> [ Reject ]
+  | AC01 | AG02 | AM05 | ERIN | MS03 | RC01 | RR01 | RR02 | RR03 | RR04 -> [ Reject; Return ]
+  | AC06 | AG01 | BE04 | MD07 | MS02 -> [ Reject; Return ]
+  | AC04 -> [ Reject; Return; Answer ]
+  | FOCR -> [ Return ]
+  | DUPL | TECH | FRAD -> [ Recall ]
+  | AC03 | AM09 -> [ Rfro ]
+  | CUST -> [ Rfro; Answer ]
+  | AM04 | ARDT | LEGL | NOAS | NOOR -> [ Answer ]
+  | AM02 | Other _ -> []
+;;
+
+let is_customer_error = function
+  | AC01 | AC04 | AC06 | AG01 | BE04 | MD07 | MS02 -> true
+  | _ -> false
+;;
