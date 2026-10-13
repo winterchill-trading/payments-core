@@ -114,7 +114,13 @@ let run t ~now ~zone =
   then Ok None
   else (
     let today = Time_ns.to_date now ~zone in
-    let run_date = t.next_run in
+    (* The latest schedule date that is due, so a catch-up run is labelled with the
+       period it pays for now rather than the oldest missed one. *)
+    let rec latest_due d =
+      let next = Schedule.next_after t.schedule d in
+      if Date.( <= ) next today && not (past_until t next) then latest_due next else d
+    in
+    let run_date = latest_due t.next_run in
     let id = Transfer.Id.of_string (sprintf "%s:%s" (Id.to_string t.id) (Date.to_string run_date)) in
     let open Or_error.Let_syntax in
     let%map draft =

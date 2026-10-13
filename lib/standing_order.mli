@@ -3,8 +3,8 @@
     An active order is due once the current date (in the caller's zone) reaches
     [next_run]. Running it yields one {!Transfer} draft and moves [next_run] to the next
     schedule date after today. Runs missed while the process was down are not paid in a
-    burst: one draft is produced and the schedule continues from today, the safer
-    failure for the customer. Paused orders skip their dates; resuming picks up from the
+    burst: one draft is produced, for the latest due date, and the schedule continues
+    from today, the safer failure for the customer. Paused orders skip their dates; resuming picks up from the
     next date on or after the resume day. *)
 
 open! Core
