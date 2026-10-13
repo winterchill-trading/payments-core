@@ -133,7 +133,7 @@ module Stable = struct
       ; details : Details.t
       ; status : Status.t
       ; history : (Status.t * Utc_time.Stable.V1.t) list
-      ; sca : Sca.Id.Stable.V1.t option
+      ; authorization : Sca.Authorization.t option
       ; provider_ref : string option
       }
     [@@deriving bin_io, sexp, compare, equal]
@@ -245,7 +245,7 @@ let draft
   ; details
   ; status = Draft
   ; history = [ Draft, now ]
-  ; sca = None
+  ; authorization = None
   ; provider_ref = None
   }
 ;;
@@ -295,7 +295,7 @@ let incoming
   ; details
   ; status
   ; history = [ status, now ]
-  ; sca = None
+  ; authorization = None
   ; provider_ref
   }
 ;;
@@ -358,7 +358,13 @@ let transition t ~to_ ~at =
 
 let require_sca t ~challenge ~at =
   Or_error.map (transition t ~to_:Awaiting_sca ~at) ~f:(fun t ->
-    { t with sca = Some challenge })
+    { t with authorization = Some (Sca challenge) })
+;;
+
+let exempt t ~exemption =
+  match t.status with
+  | Draft -> Ok { t with authorization = Some (Exempt exemption) }
+  | status -> Or_error.error_s [%message "exemptions apply to drafts" (status : Status.t)]
 ;;
 
 let map_sepa t ~f =
@@ -368,6 +374,11 @@ let map_sepa t ~f =
 ;;
 
 let submit t ?provider_ref ~at () =
+  let%bind.Or_error () =
+    match t.direction, t.authorization with
+    | Out, None -> Or_error.error_string "outgoing transfer needs SCA or a recorded exemption"
+    | _ -> Ok ()
+  in
   Or_error.map (transition t ~to_:Submitted ~at) ~f:(fun t ->
     { t with provider_ref = Option.first_some provider_ref t.provider_ref }
     |> map_sepa ~f:(fun d -> { d with acceptance_time = Some at }))

@@ -120,7 +120,7 @@ module Stable : sig
       ; details : Details.t
       ; status : Status.t
       ; history : (Status.t * Utc_time.Stable.V1.t) list (** newest first *)
-      ; sca : Sca.Id.Stable.V1.t option
+      ; authorization : Sca.Authorization.t option
       ; provider_ref : string option (** the provider's id, once submitted *)
       }
     [@@deriving bin_io, sexp, compare, equal]
@@ -139,7 +139,7 @@ type t = Stable.V1.t =
   ; details : Details.t
   ; status : Status.t
   ; history : (Status.t * Time_ns.t) list
-  ; sca : Sca.Id.t option
+  ; authorization : Sca.Authorization.t option
   ; provider_ref : string option
   }
 [@@deriving sexp, compare, equal]
@@ -188,9 +188,15 @@ val can_transition : t -> Status.t -> bool
     duplicate event instead of stamping it twice. *)
 val transition : t -> to_:Status.t -> at:Time_ns.t -> t Or_error.t
 
+(** Moves to [Awaiting_sca] and records the challenge as the authorization. *)
 val require_sca : t -> challenge:Sca.Id.t -> at:Time_ns.t -> t Or_error.t
 
-(** Submits; for SEPA the acceptance time stamp is set to [at]. *)
+(** Records that SCA was skipped under [exemption] (its RTS article goes with it). *)
+val exempt : t -> exemption:Sca.Exemption.t -> t Or_error.t
+
+(** Submits; for SEPA the acceptance time stamp is set to [at]. An outgoing transfer
+    needs an authorization first ({!require_sca} with a verified challenge, or
+    {!exempt}). *)
 val submit : t -> ?provider_ref:string -> at:Time_ns.t -> unit -> t Or_error.t
 
 (** Applies a pacs.002 status report: [RCVD]/[ACTC]/[ACCP] keep [Submitted],
