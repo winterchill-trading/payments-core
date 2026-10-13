@@ -12,6 +12,7 @@ module Crypto_address = Crypto_address
 module Lightning = Lightning
 module Beneficiary = Beneficiary
 module Sca = Sca
+module Confirmation_policy = Confirmation_policy
 module Transfer = Transfer
 module Booking = Booking
 module Schedule = Schedule
