@@ -58,23 +58,21 @@ let%expect_test "outgoing SEPA: hold, settle with a fee, then returned" =
   |> finish;
   [%expect
     {|
-    evt-in-1/deposit  (Transfer deposit)  ref=in-1
+    evt-in-1/deposit  DEPOSIT  (Transfer deposit)  ref=in-1
       debit  settlement:sepa_credit/EUR               100.00 EUR
       credit customer:1/eur                           100.00 EUR
     -- Submitted
-    evt-1/hold  (Hold_place transfer:tr-1)  ref=tr-1
+    evt-1/hold  WITHDRAWAL  (Hold_place transfer:tr-1)  ref=tr-1
       debit  customer:1/eur                           25.50 EUR
       credit customer:1/eur/pending                   25.50 EUR
     -- Pending
     -- Settled
-    evt-3/capture  (Hold_capture transfer:tr-1)  ref=tr-1
-      debit  customer:1/eur/pending                   25.00 EUR
+    evt-3/capture  WITHDRAWAL  (Hold_capture transfer:tr-1)  ref=tr-1
+      debit  customer:1/eur/pending                   25.50 EUR
       credit settlement:sepa_credit/EUR               25.00 EUR
-    evt-3/fee  (Hold_capture transfer:tr-1)  ref=tr-1
-      debit  customer:1/eur/pending                   0.50 EUR
       credit income:fees/EUR                          0.50 EUR
     -- Returned
-    evt-4/return  (Transfer return)  ref=tr-1
+    evt-4/return  RETURN  (Transfer return)  ref=tr-1  sca=(Exemption"Art 16 Low_value_remote")
       debit  settlement:sepa_credit/EUR               25.00 EUR
       credit customer:1/eur                           25.00 EUR
     customer:1/eur                           available=99.50 held=0.00
@@ -91,15 +89,15 @@ let%expect_test "outgoing SEPA: failed after submission releases the hold" =
   |> finish;
   [%expect
     {|
-    evt-in-1/deposit  (Transfer deposit)  ref=in-1
+    evt-in-1/deposit  DEPOSIT  (Transfer deposit)  ref=in-1
       debit  settlement:sepa_credit/EUR               100.00 EUR
       credit customer:1/eur                           100.00 EUR
     -- Submitted
-    evt-1/hold  (Hold_place transfer:tr-1)  ref=tr-1
+    evt-1/hold  WITHDRAWAL  (Hold_place transfer:tr-1)  ref=tr-1
       debit  customer:1/eur                           25.50 EUR
       credit customer:1/eur/pending                   25.50 EUR
     -- Rejected
-    evt-2/release  (Hold_release transfer:tr-1)  ref=tr-1
+    evt-2/release  HOLD  (Hold_release transfer:tr-1)  ref=tr-1
       debit  customer:1/eur/pending                   25.50 EUR
       credit customer:1/eur                           25.50 EUR
     customer:1/eur                           available=100.00 held=0.00
@@ -116,7 +114,7 @@ let%expect_test "outgoing over the available balance is refused at submission" =
   |> finish;
   [%expect
     {|
-    evt-in-1/deposit  (Transfer deposit)  ref=in-1
+    evt-in-1/deposit  DEPOSIT  (Transfer deposit)  ref=in-1
       debit  settlement:sepa_credit/EUR               20.00 EUR
       credit customer:1/eur                           20.00 EUR
     (refused
@@ -153,21 +151,95 @@ let%expect_test "incoming pending then settled with a fee, then returned" =
   [%expect
     {|
     -- Settled
-    evt-1/deposit  (Transfer deposit)  ref=in-2
+    evt-1/deposit  DEPOSIT  (Transfer deposit)  ref=in-2
       debit  settlement:sepa_credit/EUR               40.00 EUR
       credit customer:1/eur                           40.00 EUR
-    evt-1/fee  (Transfer fee)  ref=in-2
+    evt-1/fee  FEE  (Transfer fee)  ref=in-2
       debit  customer:1/eur                           0.20 EUR
       credit income:fees/EUR                          0.20 EUR
     -- Returned
-    evt-2/fee-refund  (Transfer fee-refund)  ref=in-2
+    evt-2/fee-refund  REFUND  (Transfer fee-refund)  ref=in-2
       debit  income:fees/EUR                          0.20 EUR
       credit customer:1/eur                           0.20 EUR
-    evt-2/return  (Transfer return)  ref=in-2
+    evt-2/return  RETURN  (Transfer return)  ref=in-2
       debit  customer:1/eur                           40.00 EUR
       credit settlement:sepa_credit/EUR               40.00 EUR
     customer:1/eur                           available=0.00 held=0.00
     settlement:sepa_credit/EUR               available=0.00 held=0.00
     income:fees/EUR                          available=0.00 held=0.00
+    |}]
+;;
+
+let%expect_test "a transition posts to a journal as one linked record, once" =
+  let dir = Core_unix.mkdtemp (Filename.concat Filename.temp_dir_name "payments-core") in
+  let path = Filename.concat dir "journal" in
+  let clock = Async_kernel.Time_source.create ~now:t0 () in
+  let time_source = Async_kernel.Time_source.read_only clock in
+  let j = Ledger.Journal.create ~time_source ~fsync:false path |> Or_error.ok_exn in
+  (* The journal stamps a linked group now, now+1ns, ...; with a frozen clock the next
+     group would start before the last one, so move the clock on between posts. *)
+  let tick = ref 0 in
+  let advance () =
+    incr tick;
+    Async_kernel.Time_source.advance_directly clock ~to_:(at !tick)
+  in
+  List.iter
+    (Ledger.Account.create customer Liability
+     :: Booking.Chart.accounts
+          chart
+          ~rails:[ Sepa_credit ]
+          ~currencies:[ Money.Currency.eur ])
+    ~f:(fun a ->
+      ignore
+        (Ledger.Journal.open_account j a |> Or_error.ok_exn
+         : Ledger.Journal.Append_result.t));
+  let book t ~to_ ~event_id =
+    advance ();
+    let entries =
+      Booking.transition chart (Ledger.Journal.balances j) t ~to_ ~event_id ~at:(at !tick)
+      |> Or_error.ok_exn
+    in
+    let r1 = Booking.post j entries |> Or_error.ok_exn in
+    let r2 = Booking.post j entries |> Or_error.ok_exn in
+    let dup = function
+      | Ledger.Journal.Append_result.Duplicate _ -> "duplicate"
+      | Appended _ -> "appended"
+    in
+    printf
+      "%s: %d entries, first %s, replay %s\n"
+      event_id
+      (List.length entries)
+      (dup r1)
+      (dup r2)
+  in
+  let deposit =
+    Transfer.incoming
+      ~id:(Transfer.Id.of_string "in-1")
+      ~rail:Sepa_credit
+      ~account:customer
+      ~details:(sepa_details ())
+      ~from:(External { name = "Payer"; detail = "x" })
+      ~amount:(eur "100.00")
+      ~status:Pending
+      ~now:t0
+      ()
+    |> Or_error.ok_exn
+  in
+  book deposit ~to_:Settled ~event_id:"evt-in";
+  let t = draft () in
+  book t ~to_:Submitted ~event_id:"evt-1";
+  let t = Transfer.submit t ~at:t0 () |> Or_error.ok_exn in
+  book t ~to_:Settled ~event_id:"evt-2";
+  printf
+    "available %s\n"
+    (Money.Amount.to_string
+       (Ledger.Balances.available (Ledger.Journal.balances j) customer Money.Currency.eur));
+  Ledger.Journal.close j;
+  [%expect
+    {|
+    evt-in: 1 entries, first appended, replay duplicate
+    evt-1: 1 entries, first appended, replay duplicate
+    evt-2: 1 entries, first appended, replay duplicate
+    available 74.50 EUR
     |}]
 ;;
