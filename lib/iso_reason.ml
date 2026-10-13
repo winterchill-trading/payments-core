@@ -15,6 +15,7 @@ module Stable = struct
       | AC06
       | AG01
       | AG02
+      | AM02
       | AM04
       | AM05
       | AM09
@@ -62,6 +63,7 @@ let table =
   ; AC06, "Blocked account"
   ; AG01, "Transaction forbidden"
   ; AG02, "Invalid bank operation code"
+  ; AM02, "Not allowed amount"
   ; AM04, "Insufficient funds"
   ; AM05, "Duplication"
   ; AM09, "Wrong amount"

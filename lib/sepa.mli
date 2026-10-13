@@ -65,9 +65,12 @@ end
 (** Highest SCT Inst amount the scheme allows, if any. *)
 val inst_max_amount : Money.Amount.t option
 
-(** Fails on a non-EUR amount, a charge bearer other than [SLEV], invalid parties or
-    texts, debtor or creditor IBANs outside SEPA, or an SCT Inst amount over
-    {!inst_max_amount}. *)
+(** The scheme's amount field range (AT-T002): 0.01 to 999 999 999.99 EUR. *)
+val max_amount : Money.Amount.t
+
+(** Fails on a non-EUR amount, one outside 0.01 .. {!max_amount}, a charge bearer other
+    than [SLEV], invalid parties or texts, debtor or creditor IBANs outside SEPA, or an
+    SCT Inst amount over {!inst_max_amount}. *)
 val validate : Scheme.t -> Details.t -> amount:Money.Amount.t -> unit Or_error.t
 
 module Use : sig
@@ -75,23 +78,30 @@ module Use : sig
   type t =
     | Reject (** before settlement (pacs.002 RJCT) *)
     | Return (** after settlement, by the beneficiary bank (pacs.004) *)
-    | Recall (** request by the originator bank (camt.056) *)
-    | Recall_refusal (** negative answer to a recall (camt.029) *)
+    | Recall (** recall by the originator bank (camt.056: DUPL, TECH, FRAD) *)
+    | Rfro
+    (** request for recall by the originator, i.e. the customer's own mistake
+        (camt.056: AC03, AM09, CUST); the beneficiary must consent *)
+    | Recall_refusal (** negative answer to a recall or RFRO (camt.029) *)
   [@@deriving sexp, compare, equal, enumerate]
 end
 
-(** Reason codes the rulebook lists for a use. *)
+(** Reason codes the rulebook lists for a use. SCT Inst has no returns after
+    acceptance: its only pacs.004 is the positive answer to a recall ([FOCR]). *)
 val reasons : Scheme.t -> Use.t -> Iso_reason.t list
 
 val check_reason : Scheme.t -> Use.t -> Iso_reason.t -> unit Or_error.t
 
 module Inst : sig
-  (** Target maximum execution time from the acceptance time stamp. *)
-  val max_execution_time : Time_ns.Span.t
+  (** Rulebook target for the whole round trip (2025 rulebook, 5-7-9 s sub-timeline). *)
+  val target : Time_ns.Span.t
 
-  (** After this, an originator bank without a confirmation treats the transfer as
-      rejected (reason [AB05]). *)
+  (** Hard limit from the acceptance time stamp (AT-T056): without a confirmation by
+      then the payer's account is restored (Instant Payments Regulation art. 5a). *)
   val timeout : Time_ns.Span.t
+
+  (** When to ask the scheme what happened (pacs.028): two seconds after the timeout. *)
+  val investigate_after : Time_ns.Span.t
 
   val timed_out : acceptance_time:Time_ns.t -> now:Time_ns.t -> bool
 end
@@ -100,9 +110,10 @@ module Deadline : sig
   (** Last business day for the beneficiary bank to return a settled SCT. *)
   val return : settled_on:Date.t -> Date.t
 
-  (** Last day the originator bank may recall: 10 business days after settlement, or
-      13 months for fraud ([FRAD]) and for customer-initiated recalls ([AC03], [AM09],
-      [CUST]). *)
+  (** Last day the originator bank may send a recall: 10 business days after settlement
+      for [DUPL] and [TECH], 13 months for [FRAD]. The rulebook window for a request for
+      recall by the originator ([AC03], [AM09], [CUST]) was not confirmed; this uses 13
+      months as well. *)
   val recall : settled_on:Date.t -> Iso_reason.t -> Date.t
 
   (** The beneficiary bank answers a recall within 15 business days. *)

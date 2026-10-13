@@ -63,12 +63,22 @@ end
    (the Instant Payments Regulation lets customers set their own limits instead). *)
 let inst_max_amount = None
 
+let max_amount =
+  Money.Amount.of_decimal_string Money.Currency.eur "999999999.99" |> Or_error.ok_exn
+;;
+
 let validate (scheme : Scheme.t) (d : Details.t) ~amount =
   let open Or_error.Let_syntax in
   let%bind () =
     if Money.Currency.equal (Money.Amount.currency amount) Money.Currency.eur
     then Ok ()
     else Or_error.error_s [%message "SEPA transfers are in EUR" (amount : Money.Amount.t)]
+  in
+  let%bind () =
+    match Money.Amount.compare_value amount max_amount with
+    | Ok c when c > 0 || not (Money.Amount.is_positive amount) ->
+      Or_error.error_s [%message "SEPA amount out of range" (amount : Money.Amount.t)]
+    | _ -> Ok ()
   in
   let%bind () =
     match d.charge_bearer with
@@ -107,6 +117,7 @@ module Use = struct
     | Reject
     | Return
     | Recall
+    | Rfro
     | Recall_refusal
   [@@deriving sexp, compare, equal, enumerate]
 end
@@ -123,8 +134,12 @@ let reasons (scheme : Scheme.t) (use : Use.t) : Iso_reason.t list =
       | Sct -> []
     in
     common_reject_return @ Iso_reason.[ CNOR; DNOR; ERIN; FF01; TM01 ] @ inst_only
-  | Return -> common_reject_return @ Iso_reason.[ ERIN; FOCR ]
-  | Recall -> [ DUPL; TECH; FRAD; AC03; AM09; CUST ]
+  | Return ->
+    (match scheme with
+     | Sct -> common_reject_return @ Iso_reason.[ ERIN; FOCR ]
+     | Sct_inst -> [ FOCR ])
+  | Recall -> [ DUPL; TECH; FRAD ]
+  | Rfro -> [ AC03; AM09; CUST ]
   | Recall_refusal -> [ NOAS; NOOR; ARDT; AC04; AM04; LEGL; CUST ]
 ;;
 
@@ -141,11 +156,11 @@ let check_reason scheme use reason =
 ;;
 
 module Inst = struct
-  let max_execution_time = Time_ns.Span.of_sec 10.
-
-  (* The originator bank's time-out deadline is the 10 second target plus a margin for
-     the confirmation to travel back. *)
-  let timeout = Time_ns.Span.of_sec 20.
+  (* The 2025 rulebook replaced the old 10 s target / 20 s time-out with a 10 s hard
+     limit and a 5-7-9 s sub-timeline. *)
+  let target = Time_ns.Span.of_sec 5.
+  let timeout = Time_ns.Span.of_sec 10.
+  let investigate_after = Time_ns.Span.of_sec 12.
 
   let timed_out ~acceptance_time ~now =
     Time_ns.Span.( > ) (Time_ns.diff now acceptance_time) timeout
@@ -157,6 +172,7 @@ module Deadline = struct
 
   let recall ~settled_on (reason : Iso_reason.t) =
     match reason with
+    (* RFRO codes (AC03, AM09, CUST): the window was not confirmed, 13 months assumed. *)
     | FRAD | AC03 | AM09 | CUST -> Date.add_months settled_on 13
     | _ -> Target_calendar.add_business_days settled_on 10
   ;;
