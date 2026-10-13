@@ -1,9 +1,8 @@
 (** When an incoming on-chain deposit counts as settled.
 
-    Bitcoin has only probabilistic finality: credit after 3 confirmations, 6 above
-    10 000 EUR. Ethereum-style chains finalize checkpoints (about 15 minutes on
-    Ethereum): credit at the [finalized] block tag. Tron and Solana use a fixed
-    confirmation count here. *)
+    Bitcoin has only probabilistic finality: credit after 3 confirmations, 6 above 10 000
+    EUR. Ethereum-style chains finalize checkpoints (about 15 minutes on Ethereum): credit
+    at the [finalized] block tag. Tron and Solana use a fixed confirmation count here. *)
 
 open! Core
 

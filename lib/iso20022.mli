@@ -9,8 +9,7 @@ module Sepa_text : sig
       transliterated on the way, so the core refuses it. *)
   val is_valid : string -> bool
 
-  (** Fails on an empty string, a string over [max_length], or characters outside the
-      set. *)
+  (** Fails on an empty string, a string over [max_length], or characters outside the set. *)
   val check : field:string -> max_length:int -> string -> unit Or_error.t
 
   (** Identifiers additionally must not start or end with ['/'] or contain ["//"]. *)
@@ -29,8 +28,8 @@ end
 module Payment_id : sig
   type t =
     { end_to_end_id : string
-    (** set by the originator, carried unchanged to the beneficiary; 1-35 SEPA
-        characters; ["NOTPROVIDED"] when the customer gave none *)
+    (** set by the originator, carried unchanged to the beneficiary; 1-35 SEPA characters;
+        ["NOTPROVIDED"] when the customer gave none *)
     ; instruction_id : string option (** point-to-point id between two agents *)
     ; uetr : Uetr.t option
     ; tx_id : string option (** interbank transaction id, from the provider *)
@@ -39,7 +38,7 @@ module Payment_id : sig
     }
   [@@deriving bin_io, sexp, compare, equal, hash]
 
-    val create
+  val create
     :  end_to_end_id:string
     -> ?instruction_id:string
     -> ?uetr:Uetr.t
@@ -48,17 +47,18 @@ module Payment_id : sig
     -> ?pmt_inf_id:string
     -> unit
     -> t Or_error.t
+
   val not_provided : string
 
-  (** Our own identifiers for a new transfer: an end-to-end id derived from
-      [transfer_id] (characters outside the SEPA set become ['-'], slashes are made
-      legal, at most 35 characters) and a fresh UETR. *)
+  (** Our own identifiers for a new transfer: an end-to-end id derived from [transfer_id]
+      (characters outside the SEPA set become ['-'], slashes are made legal, at most 35
+      characters) and a fresh UETR. *)
   val generate : transfer_id:string -> Random.State.t -> t
 end
 
 module Creditor_reference : sig
-  (** ISO 11649 structured creditor reference: [RF], two check digits (mod 97 as in
-      IBANs) and up to 21 alphanumerics, e.g. [RF18 5390 0754 7034]. *)
+  (** ISO 11649 structured creditor reference: [RF], two check digits (mod 97 as in IBANs)
+      and up to 21 alphanumerics, e.g. [RF18 5390 0754 7034]. *)
   type t [@@deriving bin_io, sexp, compare, equal, hash]
 
   val of_string : string -> t Or_error.t
@@ -81,8 +81,8 @@ end
 
 module Postal_address : sig
   (** Structured address. From November 2026 SEPA messages may no longer carry a fully
-      unstructured address: town and country are mandatory, address lines are only
-      allowed alongside them ("hybrid"). *)
+      unstructured address: town and country are mandatory, address lines are only allowed
+      alongside them ("hybrid"). *)
   type t =
     { country : string (** ISO 3166 alpha-2 *)
     ; town : string

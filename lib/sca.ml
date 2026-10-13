@@ -42,7 +42,9 @@ module Binding = struct
   let digest fields =
     (* Length-prefixed fields so "ab"+"c" and "a"+"bc" hash differently. *)
     let field s = sprintf "%d:%s|" (String.length s) s in
-    Cryptokit.hash_string (Cryptokit.Hash.sha256 ()) (String.concat (List.map fields ~f:field))
+    Cryptokit.hash_string
+      (Cryptokit.Hash.sha256 ())
+      (String.concat (List.map fields ~f:field))
     |> hex
   ;;
 
@@ -52,7 +54,9 @@ module Binding = struct
     ]
   ;;
 
-  let create ~operation ~amount ~payee = digest ((operation :: amount_fields amount) @ [ payee ])
+  let create ~operation ~amount ~payee =
+    digest ((operation :: amount_fields amount) @ [ payee ])
+  ;;
 
   let create_batch ~operation ~total ~payees =
     digest ((operation :: amount_fields total) @ List.sort payees ~compare:String.compare)
@@ -191,7 +195,8 @@ let record (c : Challenge.t) ~now ~kind ~correct =
       if attempts >= c.max_attempts
       then
         { c with attempts; status = Failed Too_many_attempts }, Rejected Too_many_attempts
-      else { c with attempts }, Wrong_response { attempts_left = c.max_attempts - attempts })
+      else
+        { c with attempts }, Wrong_response { attempts_left = c.max_attempts - attempts })
 ;;
 
 module type Verifier = sig
@@ -201,7 +206,8 @@ end
 let verify (module V : Verifier) (c : Challenge.t) ~binding ~kind ~response ~now =
   if not (Binding.equal binding c.binding)
   then return (c, Outcome.Binding_mismatch)
-  else if (not (Challenge.is_open c ~now)) || not (List.mem c.factors kind ~equal:Kind.equal)
+  else if (not (Challenge.is_open c ~now))
+          || not (List.mem c.factors kind ~equal:Kind.equal)
   then return (record c ~now ~kind ~correct:false)
   else (
     let%map correct = V.check c ~kind ~response in
@@ -262,7 +268,10 @@ module Lock = struct
             }
           , Some Notice.Locked_temporarily_next_is_permanent )
         else
-          ( { consecutive_failures = 0; temporary_locks = t.temporary_locks; status = Permanent }
+          ( { consecutive_failures = 0
+            ; temporary_locks = t.temporary_locks
+            ; status = Permanent
+            }
           , Some Locked_permanently ))
   ;;
 
@@ -364,11 +373,16 @@ module Counters = struct
   ;;
 
   let reset = zero
-  let leq a b = Money.Amount.compare_value a b |> Result.ok |> Option.value_map ~default:false ~f:(fun c -> c <= 0)
 
-  (* Art 16 and art 11: the single payment cap must hold, and either the cumulative sum
-     or the count since the last SCA; the PSP may pick either, we require the sum and
-     the count both, the stricter reading. *)
+  let leq a b =
+    Money.Amount.compare_value a b
+    |> Result.ok
+    |> Option.value_map ~default:false ~f:(fun c -> c <= 0)
+  ;;
+
+  (* Art 16 and art 11: the single payment cap must hold, and either the cumulative sum or
+     the count since the last SCA; the PSP may pick either, we require the sum and the
+     count both, the stricter reading. *)
   let ok ~single ~cumulative ~count ~sum ~n ~amount =
     leq amount (eur single)
     && leq (Money.Amount.add_exn sum amount) (eur cumulative)
@@ -390,7 +404,10 @@ module Counters = struct
   ;;
 
   let record_remote t ~amount =
-    { t with remote_count = t.remote_count + 1; remote_sum = Money.Amount.add_exn t.remote_sum amount }
+    { t with
+      remote_count = t.remote_count + 1
+    ; remote_sum = Money.Amount.add_exn t.remote_sum amount
+    }
   ;;
 
   let record_contactless t ~amount =
@@ -467,8 +484,12 @@ module Totp = struct
   let step = 30
 
   let code ~secret ~time ~digits =
-    let counter = Int63.to_int_exn (Time_ns.to_int63_ns_since_epoch time) / 1_000_000_000 / step in
-    let msg = String.init 8 ~f:(fun i -> Char.of_int_exn ((counter lsr (8 * (7 - i))) land 0xff)) in
+    let counter =
+      Int63.to_int_exn (Time_ns.to_int63_ns_since_epoch time) / 1_000_000_000 / step
+    in
+    let msg =
+      String.init 8 ~f:(fun i -> Char.of_int_exn ((counter lsr (8 * (7 - i))) land 0xff))
+    in
     let mac = Cryptokit.hash_string (Cryptokit.MAC.hmac_sha1 secret) msg in
     (* RFC 4226 dynamic truncation *)
     let offset = Char.to_int mac.[19] land 0xf in

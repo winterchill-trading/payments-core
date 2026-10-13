@@ -1,6 +1,6 @@
 (** Business Identifier Codes (ISO 9362): 4-letter institution, 2-letter country,
-    2-character location and an optional 3-character branch. Optional for SEPA
-    payments, which route on the IBAN alone. *)
+    2-character location and an optional 3-character branch. Optional for SEPA payments,
+    which route on the IBAN alone. *)
 
 open! Core
 

@@ -1,8 +1,10 @@
 open! Core
 
-module Id = Opaque_id.Make (struct
-    let module_name = "Payments_core.Beneficiary.Id"
-  end)
+module Id =
+  Opaque_id.Make
+    (struct
+      let module_name = "Payments_core.Beneficiary.Id"
+    end)
     ()
 
 module Payee_check = struct
@@ -84,7 +86,9 @@ let create ~id ~owner ~name ~rail ?bic ?memo ~now raw =
   let open Or_error.Let_syntax in
   let name = String.strip name in
   let%bind () =
-    if String.is_empty name then Or_error.error_string "beneficiary name is empty" else Ok ()
+    if String.is_empty name
+    then Or_error.error_string "beneficiary name is empty"
+    else Ok ()
   in
   let%map destination = destination_for ~rail ?bic ?memo raw in
   { id; owner; name; destination; trusted = false; first_seen = now; payee_check = None }

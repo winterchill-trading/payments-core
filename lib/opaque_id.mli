@@ -1,5 +1,5 @@
-(** Opaque string identifiers; each [Make ()] gives a type that does not unify with
-    the others, so a transfer id cannot be passed where a beneficiary id is expected. *)
+(** Opaque string identifiers; each [Make ()] gives a type that does not unify with the
+    others, so a transfer id cannot be passed where a beneficiary id is expected. *)
 
 open! Core
 
@@ -15,7 +15,8 @@ module type S = sig
   end
 end
 
-module Make (_ : sig
-    val module_name : string
-  end)
+module Make
+    (_ : sig
+       val module_name : string
+     end)
     () : S

@@ -32,8 +32,8 @@ val bban : t -> string
 (** The country belongs to the SEPA scheme, so SEPA rails can reach the account. *)
 val is_sepa : t -> bool
 
-(** IBAN length for a country, [None] when the country does not issue IBANs (or is not
-    in the table this library knows). *)
+(** IBAN length for a country, [None] when the country does not issue IBANs (or is not in
+    the table this library knows). *)
 val length_for_country : string -> int option
 
 (** Two check digits for a country and BBAN, used to build valid test IBANs. *)

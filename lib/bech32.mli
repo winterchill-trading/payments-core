@@ -1,5 +1,5 @@
-(** Bech32 (BIP 173) and Bech32m (BIP 350) strings: SegWit addresses, Lightning
-    invoices (BOLT 11) and LNURLs. Data is a list of 5-bit values. *)
+(** Bech32 (BIP 173) and Bech32m (BIP 350) strings: SegWit addresses, Lightning invoices
+    (BOLT 11) and LNURLs. Data is a list of 5-bit values. *)
 
 open! Core
 
@@ -23,8 +23,8 @@ val encode : hrp:string -> data:int list -> Variant.t -> string
     pass [Int.max_value]. Mixed case is rejected. *)
 val decode : ?max_length:int -> string -> decoded option
 
-(** Regroups bits, e.g. 8-bit bytes to 5-bit values and back. With [pad:false],
-    leftover bits must be zero padding of fewer than [from] bits. *)
+(** Regroups bits, e.g. 8-bit bytes to 5-bit values and back. With [pad:false], leftover
+    bits must be zero padding of fewer than [from] bits. *)
 val convert_bits : int list -> from:int -> to_:int -> pad:bool -> int list option
 
 (** SegWit address for [hrp] ([bc], [tb], [bcrt]): witness version and program bytes. *)

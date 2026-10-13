@@ -1,11 +1,11 @@
-(** Originator and beneficiary information that must travel with a crypto-asset
-    transfer (FATF Recommendation 16, EU Transfer of Funds Regulation 2023/1113).
+(** Originator and beneficiary information that must travel with a crypto-asset transfer
+    (FATF Recommendation 16, EU Transfer of Funds Regulation 2023/1113).
 
     Under the EU regulation there is no minimum amount between service providers: every
     transfer carries the originator's name, account (address) and one identifying
-    attribute, and the beneficiary's name and account. A transfer of more than 1000 EUR
-    to or from a self-hosted wallet additionally needs the provider to have verified that
-    its customer owns or controls that wallet. *)
+    attribute, and the beneficiary's name and account. A transfer of more than 1000 EUR to
+    or from a self-hosted wallet additionally needs the provider to have verified that its
+    customer owns or controls that wallet. *)
 
 open! Core
 
@@ -75,6 +75,6 @@ type t = Stable.V1.t =
 (** The self-hosted wallet threshold: 1000 EUR. *)
 val self_hosted_threshold_eur : Money.Amount.t
 
-(** Fails when a required field is missing. [eur_value] is the transfer's value in EUR
-    at the time; when unknown, a self-hosted wallet must be verified. *)
+(** Fails when a required field is missing. [eur_value] is the transfer's value in EUR at
+    the time; when unknown, a self-hosted wallet must be verified. *)
 val check : t -> eur_value:Money.Amount.t option -> unit Or_error.t

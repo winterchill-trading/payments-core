@@ -1,14 +1,14 @@
 (** Strong customer authentication (PSD2 art. 97, RTS 2018/389).
 
-    SCA needs two elements from different categories: knowledge, possession, inherence.
-    An SMS OTP, an authenticator app code and a passkey are all possession, so a
-    challenge pairs one of them with a PIN, password or biometric. A challenge is bound
-    to what it authorises ({!Binding}: operation, amount, currency and payee; RTS art. 5
-    dynamic linking), is consumed once verified (art. 4(1)), and fails after at most five
-    wrong answers (art. 4(3)(b)); a wrong answer never says which factor was wrong
-    (art. 4(3)(a)). How a response is checked is abstract ({!Verifier}). When SCA is
-    skipped, the {!Exemption} and its RTS article are recorded, since the payer's bank
-    carries the loss of an exempted fraudulent payment (PSD2 art. 74(2)). *)
+    SCA needs two elements from different categories: knowledge, possession, inherence. An
+    SMS OTP, an authenticator app code and a passkey are all possession, so a challenge
+    pairs one of them with a PIN, password or biometric. A challenge is bound to what it
+    authorises ({!Binding}: operation, amount, currency and payee; RTS art. 5 dynamic
+    linking), is consumed once verified (art. 4(1)), and fails after at most five wrong
+    answers (art. 4(3)(b)); a wrong answer never says which factor was wrong (art.
+    4(3)(a)). How a response is checked is abstract ({!Verifier}). When SCA is skipped,
+    the {!Exemption} and its RTS article are recorded, since the payer's bank carries the
+    loss of an exempted fraudulent payment (PSD2 art. 74(2)). *)
 
 open! Core
 open Async_kernel
@@ -151,8 +151,8 @@ module type Verifier = sig
 end
 
 (** Checks [response] for factor [kind] of the operation identified by [binding]. The
-    verifier is not called when the challenge is closed, bound to a different operation
-    or did not ask for [kind]. *)
+    verifier is not called when the challenge is closed, bound to a different operation or
+    did not ask for [kind]. *)
 val verify
   :  (module Verifier)
   -> Challenge.t
@@ -164,8 +164,8 @@ val verify
 
 module Lock : sig
   (** Per-customer blocking across challenges (RTS art. 4(3)(b) and 4(4)): five
-      consecutive failures lock for 30 minutes; a second temporary lock within 24 hours
-      is permanent until a secure re-enablement. The customer is alerted when the first
+      consecutive failures lock for 30 minutes; a second temporary lock within 24 hours is
+      permanent until a secure re-enablement. The customer is alerted when the first
       temporary lock starts, before any permanent block. *)
   type status =
     | Unlocked
@@ -197,8 +197,8 @@ module Lock : sig
 end
 
 module Session : sig
-  (** Online access session after SCA; it ends after 5 minutes without activity
-      (RTS art. 4(3)(d)). *)
+  (** Online access session after SCA; it ends after 5 minutes without activity (RTS art.
+      4(3)(d)). *)
   type t =
     { subject : string
     ; authenticated_at : Utc_time.Stable.V1.t
@@ -279,8 +279,8 @@ module Counters : sig
 end
 
 module Event : sig
-  (** One audit record per challenge transition. Codes, PINs and passwords are never
-      part of it. *)
+  (** One audit record per challenge transition. Codes, PINs and passwords are never part
+      of it. *)
   type t =
     { challenge : Id.Stable.V1.t
     ; subject : string
@@ -319,7 +319,7 @@ module Totp : sig
   (** RFC 6238 time-based codes with HMAC-SHA1 and a 30-second step. *)
   val code : secret:string -> time:Time_ns.t -> digits:int -> string
 
-  (** Accepts the code for the current step and [window] steps either side, which
-      covers phone clocks a little off. *)
+  (** Accepts the code for the current step and [window] steps either side, which covers
+      phone clocks a little off. *)
   val check : secret:string -> time:Time_ns.t -> ?window:int -> string -> bool
 end

@@ -7,7 +7,6 @@
     account-takeover signal. *)
 
 open! Core
-
 module Id : Opaque_id.S
 
 module Payee_check : sig
@@ -65,9 +64,9 @@ type t = Stable.V1.t =
   }
 [@@deriving bin_io, sexp, compare, equal, hash, fields]
 
-(** Parses the destination for a rail: an IBAN for SEPA rails, an address on the
-    rail's network for on-chain, an invoice, LNURL or address for Lightning, an account
-    id for intraledger. New beneficiaries start untrusted. *)
+(** Parses the destination for a rail: an IBAN for SEPA rails, an address on the rail's
+    network for on-chain, an invoice, LNURL or address for Lightning, an account id for
+    intraledger. New beneficiaries start untrusted. *)
 val create
   :  id:Id.t
   -> owner:string

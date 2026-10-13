@@ -157,7 +157,14 @@ let check_amounts ~amount ~fee =
 
 (* Details must match the rail; [creditor_iban] is the beneficiary's IBAN for outgoing
    SEPA transfers. *)
-let check_details ~(direction : Direction.t) ~rail ~amount ?creditor_iban ?eur_value details =
+let check_details
+  ~(direction : Direction.t)
+  ~rail
+  ~amount
+  ?creditor_iban
+  ?eur_value
+  details
+  =
   let open Or_error.Let_syntax in
   match Sepa.Scheme.of_rail rail, (details : Details.t option), (rail : Rail.t) with
   | Some scheme, Some (Sepa d), _ ->
@@ -170,7 +177,8 @@ let check_details ~(direction : Direction.t) ~rail ~amount ?creditor_iban ?eur_v
       | _ -> Ok ()
     in
     Details.Sepa d
-  | Some _, _, _ -> Or_error.error_s [%message "SEPA rails need SEPA details" (rail : Rail.t)]
+  | Some _, _, _ ->
+    Or_error.error_s [%message "SEPA rails need SEPA details" (rail : Rail.t)]
   | None, Some (Onchain { travel_rule = Some tr; _ } as d), Onchain _ ->
     let%map () = Travel_rule.check tr ~eur_value in
     d
@@ -187,10 +195,12 @@ let check_details ~(direction : Direction.t) ~rail ~amount ?creditor_iban ?eur_v
             ; finalized = false
             }))
   | None, Some (Lightning _ as d), Lightning -> Ok d
-  | None, None, Lightning -> Ok (Details.Lightning { payment_hash = None; preimage = None })
+  | None, None, Lightning ->
+    Ok (Details.Lightning { payment_hash = None; preimage = None })
   | None, (Some Intraledger | None), Intraledger -> Ok Details.Intraledger
   | None, (Some Card | None), Card_scheme -> Ok Details.Card
-  | None, _, _ -> Or_error.error_s [%message "details do not match the rail" (rail : Rail.t)]
+  | None, _, _ ->
+    Or_error.error_s [%message "details do not match the rail" (rail : Rail.t)]
 ;;
 
 let draft
@@ -207,7 +217,9 @@ let draft
   ()
   =
   let open Or_error.Let_syntax in
-  let fee = Option.value fee ~default:(Money.Amount.zero (Money.Amount.currency amount)) in
+  let fee =
+    Option.value fee ~default:(Money.Amount.zero (Money.Amount.currency amount))
+  in
   let%bind () = check_amounts ~amount ~fee in
   let%bind () =
     if Beneficiary.usable_on beneficiary rail
@@ -265,7 +277,9 @@ let incoming
   ()
   =
   let open Or_error.Let_syntax in
-  let fee = Option.value fee ~default:(Money.Amount.zero (Money.Amount.currency amount)) in
+  let fee =
+    Option.value fee ~default:(Money.Amount.zero (Money.Amount.currency amount))
+  in
   let%bind () = check_amounts ~amount ~fee in
   let%bind () =
     (* The fee is booked out of the credited amount; a larger fee would overdraw. *)
@@ -273,7 +287,9 @@ let incoming
     | Ok c when c > 0 ->
       Or_error.error_s
         [%message
-          "fee exceeds the incoming amount" (amount : Money.Amount.t) (fee : Money.Amount.t)]
+          "fee exceeds the incoming amount"
+            (amount : Money.Amount.t)
+            (fee : Money.Amount.t)]
     | _ -> Ok ()
   in
   let%bind () =
@@ -315,8 +331,8 @@ let can_transition t (to_ : Status.t) =
   | (Returned _ | Recall_requested _ | Recall_refused _ | Recalled), rail ->
     Rail.is_returnable rail
   | Timed_out, rail -> Rail.equal rail Sepa_instant
-  (* An outgoing payment is settled at our confirmation threshold; a reorg after that
-     is a chain incident for operations, not a state that could capture the hold twice. *)
+  (* An outgoing payment is settled at our confirmation threshold; a reorg after that is a
+     chain incident for operations, not a state that could capture the hold twice. *)
   | Reorged, Onchain _ ->
     (match t.direction, t.status with
      | Out, Settled -> false
@@ -376,7 +392,8 @@ let map_sepa t ~f =
 let submit t ?provider_ref ~at () =
   let%bind.Or_error () =
     match t.direction, t.authorization with
-    | Out, None -> Or_error.error_string "outgoing transfer needs SCA or a recorded exemption"
+    | Out, None ->
+      Or_error.error_string "outgoing transfer needs SCA or a recorded exemption"
     | _ -> Ok ()
   in
   Or_error.map (transition t ~to_:Submitted ~at) ~f:(fun t ->
@@ -384,7 +401,14 @@ let submit t ?provider_ref ~at () =
     |> map_sepa ~f:(fun d -> { d with acceptance_time = Some at }))
 ;;
 
-let apply_status_report t (code : Iso20022.Transaction_status.t) ?reason ?value_date ~at () =
+let apply_status_report
+  t
+  (code : Iso20022.Transaction_status.t)
+  ?reason
+  ?value_date
+  ~at
+  ()
+  =
   let open Or_error.Let_syntax in
   let%bind (target : Status.t option) =
     match code, t.status with
@@ -403,7 +427,10 @@ let apply_status_report t (code : Iso20022.Transaction_status.t) ?reason ?value_
     | CANC, _ -> Ok (Some Status.Cancelled)
     | (RCVD | ACTC | ACCP), _ ->
       Or_error.error_s
-        [%message "status report out of order" (code : Iso20022.Transaction_status.t) ~status:(t.status : Status.t)]
+        [%message
+          "status report out of order"
+            (code : Iso20022.Transaction_status.t)
+            ~status:(t.status : Status.t)]
   in
   let%map t =
     match target with
@@ -427,7 +454,8 @@ let check_inst_timeout t ~now =
 
 let entered_at t name =
   List.rev t.history
-  |> List.find_map ~f:(fun (s, at) -> Option.some_if (String.equal (Status.name s) name) at)
+  |> List.find_map ~f:(fun (s, at) ->
+    Option.some_if (String.equal (Status.name s) name) at)
 ;;
 
 let request_recall t ~reason ~at =
@@ -451,27 +479,50 @@ let settle_lightning t ~preimage ~at =
     let hex s = String.concat_map s ~f:(fun c -> sprintf "%02x" (Char.to_int c)) in
     let bytes =
       Option.try_with (fun () ->
-        String.init (String.length preimage / 2) ~f:(fun i ->
-          Char.of_int_exn (Int.of_string ("0x" ^ String.sub preimage ~pos:(2 * i) ~len:2))))
+        String.init
+          (String.length preimage / 2)
+          ~f:(fun i ->
+            Char.of_int_exn
+              (Int.of_string ("0x" ^ String.sub preimage ~pos:(2 * i) ~len:2))))
     in
     (match bytes with
      | Some b
        when String.length preimage = 64
-            && String.equal (hex (Cryptokit.hash_string (Cryptokit.Hash.sha256 ()) b)) hash ->
+            && String.equal
+                 (hex (Cryptokit.hash_string (Cryptokit.Hash.sha256 ()) b))
+                 hash ->
        Or_error.map (transition t ~to_:Settled ~at) ~f:(fun t ->
          { t with
-           details = Lightning { payment_hash = Some hash; preimage = Some (String.lowercase preimage) }
+           details =
+             Lightning
+               { payment_hash = Some hash; preimage = Some (String.lowercase preimage) }
          })
      | _ -> Or_error.error_s [%message "preimage does not match the payment hash" hash])
   | _ -> Or_error.error_string "no Lightning payment hash to check the preimage against"
 ;;
 
-let record_confirmations t ~tx_hash ~block_hash ~confirmations ~finalized ?eur_value ~at () =
+let record_confirmations
+  t
+  ~tx_hash
+  ~block_hash
+  ~confirmations
+  ~finalized
+  ?eur_value
+  ~at
+  ()
+  =
   match t.details, t.rail with
   | Onchain d, Onchain network ->
     let t =
       { t with
-        details = Onchain { d with tx_hash = Some tx_hash; block_hash = Some block_hash; confirmations; finalized }
+        details =
+          Onchain
+            { d with
+              tx_hash = Some tx_hash
+            ; block_hash = Some block_hash
+            ; confirmations
+            ; finalized
+            }
       }
     in
     let policy = Confirmation_policy.required network ~eur_value in

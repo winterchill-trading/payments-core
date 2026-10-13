@@ -5,7 +5,9 @@ type t =
   | Finalized
 [@@deriving sexp, compare, equal]
 
-let large_eur = Money.Amount.of_decimal_string Money.Currency.eur "10000" |> Or_error.ok_exn
+let large_eur =
+  Money.Amount.of_decimal_string Money.Currency.eur "10000" |> Or_error.ok_exn
+;;
 
 let required (network : Network.t) ~eur_value =
   match network with

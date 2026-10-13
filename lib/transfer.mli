@@ -1,5 +1,5 @@
-(** A payment between a ledger account and the outside world (or another ledger
-    account), with its lifecycle.
+(** A payment between a ledger account and the outside world (or another ledger account),
+    with its lifecycle.
 
     {v
     Draft ─> Awaiting_sca ─> Submitted ─> Pending ─> Settled ─> Returned
@@ -12,20 +12,19 @@
       └───────────┴─> Cancelled                  Failed (our side: funds, SCA, expiry)
     v}
 
-    [Rejected], [Returned], [Recall_requested] and [Recall_refused] carry ISO 20022
-    reason codes; on SEPA rails the code must be one the rulebook allows for that use
+    [Rejected], [Returned], [Recall_requested] and [Recall_refused] carry ISO 20022 reason
+    codes; on SEPA rails the code must be one the rulebook allows for that use
     ({!Sepa.check_reason}). Returns and recalls exist only on returnable rails, and SCT
     Inst has no returns except the [FOCR] answer to a recall. [Timed_out] exists only on
     SCT Inst; [Reorged] only on-chain (Pending or Settled -> Reorged -> Pending, when a
-    block is orphaned and the transaction must confirm again; outgoing transfers only
-    from Pending, while the hold is still open). Incoming transfers start
-    at [Pending] or [Settled]. Every transition is timestamped.
+    block is orphaned and the transaction must confirm again; outgoing transfers only from
+    Pending, while the hold is still open). Incoming transfers start at [Pending] or
+    [Settled]. Every transition is timestamped.
 
     Rail-specific data lives in {!Details}: the pacs.008 fields for SEPA, the travel-rule
     record for on-chain transfers, the payment hash for Lightning. *)
 
 open! Core
-
 module Id : Opaque_id.S
 
 module Direction : sig
@@ -81,8 +80,7 @@ module Counterparty : sig
     | External of
         { name : string
         ; detail : string (** IBAN, address or invoice the funds came from *)
-        }
-    (** incoming: who paid us, as reported *)
+        } (** incoming: who paid us, as reported *)
   [@@deriving bin_io, sexp, compare, equal]
 end
 
@@ -164,8 +162,8 @@ val draft
   -> unit
   -> t Or_error.t
 
-(** An incoming payment as first reported: [Pending] or [Settled]. Fails like {!draft}
-    on amounts and details, and when the fee exceeds the amount. *)
+(** An incoming payment as first reported: [Pending] or [Settled]. Fails like {!draft} on
+    amounts and details, and when the fee exceeds the amount. *)
 val incoming
   :  id:Id.t
   -> rail:Rail.t
@@ -183,9 +181,9 @@ val incoming
 
 val can_transition : t -> Status.t -> bool
 
-(** Moves to [to_] if the table, the rail and (on SEPA rails) the rulebook's reason
-    codes allow it. Repeating the current status is an error, so callers notice a
-    duplicate event instead of stamping it twice. *)
+(** Moves to [to_] if the table, the rail and (on SEPA rails) the rulebook's reason codes
+    allow it. Repeating the current status is an error, so callers notice a duplicate
+    event instead of stamping it twice. *)
 val transition : t -> to_:Status.t -> at:Time_ns.t -> t Or_error.t
 
 (** Moves to [Awaiting_sca] and records the challenge as the authorization. *)
@@ -194,9 +192,8 @@ val require_sca : t -> challenge:Sca.Id.t -> at:Time_ns.t -> t Or_error.t
 (** Records that SCA was skipped under [exemption] (its RTS article goes with it). *)
 val exempt : t -> exemption:Sca.Exemption.t -> t Or_error.t
 
-(** Submits; for SEPA the acceptance time stamp is set to [at]. An outgoing transfer
-    needs an authorization first ({!require_sca} with a verified challenge, or
-    {!exempt}). *)
+(** Submits; for SEPA the acceptance time stamp is set to [at]. An outgoing transfer needs
+    an authorization first ({!require_sca} with a verified challenge, or {!exempt}). *)
 val submit : t -> ?provider_ref:string -> at:Time_ns.t -> unit -> t Or_error.t
 
 (** Applies a pacs.002 status report: [RCVD]/[ACTC]/[ACCP] keep [Submitted],
@@ -220,12 +217,12 @@ val check_inst_timeout : t -> now:Time_ns.t -> t option
     (counted from the settlement date in UTC). *)
 val request_recall : t -> reason:Iso_reason.t -> at:Time_ns.t -> t Or_error.t
 
-(** Lightning: settles an outgoing payment on the preimage whose SHA-256 is the
-    invoice's payment hash, and keeps it as proof of payment. *)
+(** Lightning: settles an outgoing payment on the preimage whose SHA-256 is the invoice's
+    payment hash, and keeps it as proof of payment. *)
 val settle_lightning : t -> preimage:string -> at:Time_ns.t -> t Or_error.t
 
-(** On-chain: records the confirmation count (and whether the block is finalized) for
-    the transaction [tx_hash] in [block_hash]. An incoming [Pending] transfer settles once
+(** On-chain: records the confirmation count (and whether the block is finalized) for the
+    transaction [tx_hash] in [block_hash]. An incoming [Pending] transfer settles once
     {!Confirmation_policy.required} is met; [eur_value] is its EUR value for the policy. *)
 val record_confirmations
   :  t

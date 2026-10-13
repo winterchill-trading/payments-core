@@ -1,8 +1,8 @@
 (** ISO 20022 external reason codes used in SEPA rejects, returns, recalls and answers to
     recalls (ExternalStatusReason1Code, ExternalReturnReason1Code,
-    ExternalCancellationReason1Code). Codes the rulebooks list are constructors;
-    anything else a counterparty sends is kept as [Other] with its four-character code
-    so nothing is lost, and {!Sepa.check_reason} flags it. *)
+    ExternalCancellationReason1Code). Codes the rulebooks list are constructors; anything
+    else a counterparty sends is kept as [Other] with its four-character code so nothing
+    is lost, and {!Sepa.check_reason} flags it. *)
 
 open! Core
 
@@ -81,6 +81,6 @@ end
 (** Uses the rulebooks allow for this code; empty for [Other] and retired codes. *)
 val kinds : t -> Kind.t list
 
-(** The customer can fix it (wrong, closed or blocked account, missing address,
-    deceased or refusing beneficiary), as opposed to a bank or scheme problem. *)
+(** The customer can fix it (wrong, closed or blocked account, missing address, deceased
+    or refusing beneficiary), as opposed to a bank or scheme problem. *)
 val is_customer_error : t -> bool

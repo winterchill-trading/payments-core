@@ -59,8 +59,8 @@ module Details = struct
   ;;
 end
 
-(* The EPC removed the 100,000 EUR SCT Inst ceiling from the rulebook in October 2025
-   (the Instant Payments Regulation lets customers set their own limits instead). *)
+(* The EPC removed the 100,000 EUR SCT Inst ceiling from the rulebook in October 2025 (the
+   Instant Payments Regulation lets customers set their own limits instead). *)
 let inst_max_amount = None
 
 let max_amount =
@@ -85,15 +85,18 @@ let validate (scheme : Scheme.t) (d : Details.t) ~amount =
     | SLEV -> Ok ()
     | other ->
       Or_error.error_s
-        [%message "SEPA requires charge bearer SLEV" ~got:(other : Iso20022.Charge_bearer.t)]
+        [%message
+          "SEPA requires charge bearer SLEV" ~got:(other : Iso20022.Charge_bearer.t)]
   in
   let%bind () = Iso20022.Party.validate d.debtor in
   let%bind () = Iso20022.Party.validate d.creditor in
   let%bind () =
-    List.map [ "debtor", d.debtor; "creditor", d.creditor ] ~f:(fun (side, p) ->
-      if Iban.is_sepa p.iban
-      then Ok ()
-      else Or_error.error_s [%message "IBAN outside SEPA" side (Iban.country p.iban)])
+    List.map
+      [ "debtor", d.debtor; "creditor", d.creditor ]
+      ~f:(fun (side, p) ->
+        if Iban.is_sepa p.iban
+        then Ok ()
+        else Or_error.error_s [%message "IBAN outside SEPA" side (Iban.country p.iban)])
     |> Or_error.all_unit
   in
   let%bind () =
@@ -107,7 +110,8 @@ let validate (scheme : Scheme.t) (d : Details.t) ~amount =
     (match Money.Amount.compare_value amount max with
      | Ok c when c > 0 ->
        Or_error.error_s
-         [%message "over the SCT Inst maximum" (amount : Money.Amount.t) (max : Money.Amount.t)]
+         [%message
+           "over the SCT Inst maximum" (amount : Money.Amount.t) (max : Money.Amount.t)]
      | _ -> Ok ())
   | _ -> Ok ()
 ;;
@@ -124,7 +128,22 @@ end
 
 let reasons (scheme : Scheme.t) (use : Use.t) : Iso_reason.t list =
   let common_reject_return : Iso_reason.t list =
-    [ AC01; AC04; AC06; AG01; AG02; AM05; BE04; MD07; MS02; MS03; RC01; RR01; RR02; RR03; RR04 ]
+    [ AC01
+    ; AC04
+    ; AC06
+    ; AG01
+    ; AG02
+    ; AM05
+    ; BE04
+    ; MD07
+    ; MS02
+    ; MS03
+    ; RC01
+    ; RR01
+    ; RR02
+    ; RR03
+    ; RR04
+    ]
   in
   match use with
   | Reject ->
@@ -156,8 +175,8 @@ let check_reason scheme use reason =
 ;;
 
 module Inst = struct
-  (* The 2025 rulebook replaced the old 10 s target / 20 s time-out with a 10 s hard
-     limit and a 5-7-9 s sub-timeline. *)
+  (* The 2025 rulebook replaced the old 10 s target / 20 s time-out with a 10 s hard limit
+     and a 5-7-9 s sub-timeline. *)
   let target = Time_ns.Span.of_sec 5.
   let timeout = Time_ns.Span.of_sec 10.
   let investigate_after = Time_ns.Span.of_sec 12.

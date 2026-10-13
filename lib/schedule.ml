@@ -25,14 +25,18 @@ let next_on_or_after t date =
   match t with
   | Daily -> date
   | Weekly dow ->
-    let delta = (Day_of_week.to_int dow - Day_of_week.to_int (Date.day_of_week date)) % 7 in
+    let delta =
+      (Day_of_week.to_int dow - Day_of_week.to_int (Date.day_of_week date)) % 7
+    in
     Date.add_days date delta
   | Monthly { day } ->
     let this = in_month ~day ~year:(Date.year date) ~month:(Date.month date) in
     if Date.( >= ) this date
     then this
     else (
-      let first_of_next = Date.add_months (Date.create_exn ~y:(Date.year date) ~m:(Date.month date) ~d:1) 1 in
+      let first_of_next =
+        Date.add_months (Date.create_exn ~y:(Date.year date) ~m:(Date.month date) ~d:1) 1
+      in
       in_month ~day ~year:(Date.year first_of_next) ~month:(Date.month first_of_next))
 ;;
 

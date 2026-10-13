@@ -80,8 +80,8 @@ let create
     else Or_error.error_s [%message "rail cannot reach beneficiary" (rail : Rail.t)]
   in
   let first_run = Schedule.next_on_or_after schedule start in
-  (* Build the first draft now, so a template the rail rejects fails here and not on
-     the first run date. *)
+  (* Build the first draft now, so a template the rail rejects fails here and not on the
+     first run date. *)
   let%bind () =
     let%bind run_details = details_for_run ~id ~run_date:first_run details in
     Transfer.draft
@@ -153,14 +153,17 @@ let run t ~now ~zone =
   then Ok None
   else (
     let today = Time_ns.to_date now ~zone in
-    (* The latest schedule date that is due, so a catch-up run is labelled with the
-       period it pays for now rather than the oldest missed one. *)
+    (* The latest schedule date that is due, so a catch-up run is labelled with the period
+       it pays for now rather than the oldest missed one. *)
     let rec latest_due d =
       let next = Schedule.next_after t.schedule d in
       if Date.( <= ) next today && not (past_until t next) then latest_due next else d
     in
     let run_date = latest_due t.next_run in
-    let id = Transfer.Id.of_string (sprintf "%s:%s" (Id.to_string t.id) (Date.to_string run_date)) in
+    let id =
+      Transfer.Id.of_string
+        (sprintf "%s:%s" (Id.to_string t.id) (Date.to_string run_date))
+    in
     let open Or_error.Let_syntax in
     let%bind details = details_for_run ~id:t.id ~run_date t.details in
     let%bind draft =
@@ -175,8 +178,8 @@ let run t ~now ~zone =
         ~now
         ()
     in
-    (* RTS art. 14: SCA for the first payment of a series with the same amount and
-       payee; later runs are exempt. *)
+    (* RTS art. 14: SCA for the first payment of a series with the same amount and payee;
+       later runs are exempt. *)
     let%bind draft =
       if t.runs >= 1
       then Transfer.exempt draft ~exemption:Recurring_same_amount_payee
@@ -186,8 +189,7 @@ let run t ~now ~zone =
     let status : Status.t = if past_until t next_run then Finished else Active in
     return
       (Some
-         ( { t with next_run; status; runs = t.runs + 1; last_run = Some run_date }
-         , draft )))
+         ({ t with next_run; status; runs = t.runs + 1; last_run = Some run_date }, draft)))
 ;;
 
 let poll t ~time_source ~zone =

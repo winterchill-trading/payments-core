@@ -12,9 +12,10 @@ module type S = sig
   end
 end
 
-module Make (M : sig
-    val module_name : string
-  end)
+module Make
+    (M : sig
+       val module_name : string
+     end)
     () =
 struct
   module T = struct

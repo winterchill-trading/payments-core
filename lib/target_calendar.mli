@@ -1,6 +1,5 @@
-(** TARGET2 (T2) business days, the settlement calendar SEPA deadlines count in:
-    every weekday except New Year's Day, Good Friday, Easter Monday, 1 May and
-    25-26 December. *)
+(** TARGET2 (T2) business days, the settlement calendar SEPA deadlines count in: every
+    weekday except New Year's Day, Good Friday, Easter Monday, 1 May and 25-26 December. *)
 
 open! Core
 

@@ -3,12 +3,11 @@
     An active order is due once the current date (in the caller's zone) reaches
     [next_run]. Running it yields one {!Transfer} draft and moves [next_run] to the next
     schedule date after today. Runs missed while the process was down are not paid in a
-    burst: one draft is produced, for the latest due date, and the schedule continues
-    from today, the safer failure for the customer. Paused orders skip their dates; resuming picks up from the
-    next date on or after the resume day. *)
+    burst: one draft is produced, for the latest due date, and the schedule continues from
+    today, the safer failure for the customer. Paused orders skip their dates; resuming
+    picks up from the next date on or after the resume day. *)
 
 open! Core
-
 module Id : Opaque_id.S
 
 module Status : sig
@@ -59,8 +58,8 @@ type t = Stable.V1.t =
 [@@deriving sexp, compare, equal]
 
 (** The first run is the first schedule date on or after [start]. [details] is the
-    template for each draft (required on SEPA rails); each run gets its own end-to-end
-    id, [<order id>-<run date>]. Fails on an invalid schedule, a non-positive amount, a
+    template for each draft (required on SEPA rails); each run gets its own end-to-end id,
+    [<order id>-<run date>]. Fails on an invalid schedule, a non-positive amount, a
     beneficiary the rail cannot reach, details the rail does not accept, or an [until]
     before the first run. *)
 val create
@@ -80,12 +79,12 @@ val create
 val pause : t -> t Or_error.t
 val resume : t -> today:Date.t -> t Or_error.t
 val cancel : t -> t
-
 val is_due : t -> now:Time_ns.t -> zone:Time_float.Zone.t -> bool
 
 (** [None] when not due. The first run's draft needs SCA; later drafts carry the
-    recurring-payment exemption (RTS art. 14). The draft's id is [<order id>:<run date>], so running the same
-    date twice (a retry) yields the same transfer id for the caller to de-duplicate. *)
+    recurring-payment exemption (RTS art. 14). The draft's id is [<order id>:<run date>],
+    so running the same date twice (a retry) yields the same transfer id for the caller to
+    de-duplicate. *)
 val run
   :  t
   -> now:Time_ns.t

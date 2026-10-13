@@ -80,14 +80,14 @@ module Use : sig
     | Return (** after settlement, by the beneficiary bank (pacs.004) *)
     | Recall (** recall by the originator bank (camt.056: DUPL, TECH, FRAD) *)
     | Rfro
-    (** request for recall by the originator, i.e. the customer's own mistake
-        (camt.056: AC03, AM09, CUST); the beneficiary must consent *)
+    (** request for recall by the originator, i.e. the customer's own mistake (camt.056:
+        AC03, AM09, CUST); the beneficiary must consent *)
     | Recall_refusal (** negative answer to a recall or RFRO (camt.029) *)
   [@@deriving sexp, compare, equal, enumerate]
 end
 
-(** Reason codes the rulebook lists for a use. SCT Inst has no returns after
-    acceptance: its only pacs.004 is the positive answer to a recall ([FOCR]). *)
+(** Reason codes the rulebook lists for a use. SCT Inst has no returns after acceptance:
+    its only pacs.004 is the positive answer to a recall ([FOCR]). *)
 val reasons : Scheme.t -> Use.t -> Iso_reason.t list
 
 val check_reason : Scheme.t -> Use.t -> Iso_reason.t -> unit Or_error.t
@@ -96,8 +96,8 @@ module Inst : sig
   (** Rulebook target for the whole round trip (2025 rulebook, 5-7-9 s sub-timeline). *)
   val target : Time_ns.Span.t
 
-  (** Hard limit from the acceptance time stamp (AT-T056): without a confirmation by
-      then the payer's account is restored (Instant Payments Regulation art. 5a). *)
+  (** Hard limit from the acceptance time stamp (AT-T056): without a confirmation by then
+      the payer's account is restored (Instant Payments Regulation art. 5a). *)
   val timeout : Time_ns.Span.t
 
   (** When to ask the scheme what happened (pacs.028): two seconds after the timeout. *)

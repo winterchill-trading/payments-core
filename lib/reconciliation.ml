@@ -69,7 +69,9 @@ let balances ?(scope = []) balances reported =
       match Ledger.Balances.find_account balances r.account with
       | None -> Some (Diff.Unknown_account { account = r.account })
       | Some _ ->
-        let ledger = ledger_figure balances r.account (Amount.currency r.amount) r.basis in
+        let ledger =
+          ledger_figure balances r.account (Amount.currency r.amount) r.basis
+        in
         if Amount.equal ledger r.amount
         then None
         else
@@ -106,7 +108,11 @@ let transfers (ours : Transfer.t list) (theirs : Reported_transfer.t list) =
     List.filter_map ours ~f:(fun t -> Option.map t.provider_ref ~f:(fun r -> r, t))
     |> String.Map.of_alist_reduce ~f:(fun a _ -> a)
   in
-  let reported = String.Map.of_alist_reduce (List.map theirs ~f:(fun r -> r.provider_ref, r.status)) ~f:(fun a _ -> a) in
+  let reported =
+    String.Map.of_alist_reduce
+      (List.map theirs ~f:(fun r -> r.provider_ref, r.status))
+      ~f:(fun a _ -> a)
+  in
   let from_provider =
     Map.to_alist reported
     |> List.filter_map ~f:(fun (provider_ref, provider) ->
@@ -115,7 +121,10 @@ let transfers (ours : Transfer.t list) (theirs : Reported_transfer.t list) =
       | Some t ->
         if Transfer.Status.equal t.status provider
         then None
-        else Some (Status_mismatch { transfer = t.id; provider_ref; ledger = t.status; provider }))
+        else
+          Some
+            (Status_mismatch
+               { transfer = t.id; provider_ref; ledger = t.status; provider }))
   in
   let missing =
     Map.to_alist by_ref
@@ -215,7 +224,8 @@ module Break = struct
     else if not (String.is_substring adjustment.reference ~substring:t.id)
     then
       Or_error.error_s
-        [%message "adjustment does not reference the break" ~break:t.id adjustment.reference]
+        [%message
+          "adjustment does not reference the break" ~break:t.id adjustment.reference]
     else
       Ok
         { t with
@@ -231,7 +241,10 @@ end
 
 let match_transactions ?(timing_days = 1) ~business_date ours theirs =
   let recent date = business_days_between date business_date <= timing_days in
-  let ours_by = String.Map.of_alist_multi (List.map ours ~f:(fun (t : Internal_tx.t) -> t.provider_ref, t)) in
+  let ours_by =
+    String.Map.of_alist_multi
+      (List.map ours ~f:(fun (t : Internal_tx.t) -> t.provider_ref, t))
+  in
   let theirs_by =
     String.Map.of_alist_reduce
       (List.map theirs ~f:(fun (t : External_tx.t) -> t.provider_ref, t))
@@ -245,7 +258,13 @@ let match_transactions ?(timing_days = 1) ~business_date ours theirs =
       let duplicate =
         if List.length txs > 1
         then
-          [ Break.create ~kind:Duplicate ~provider_ref ~internal:first.amount ~first_seen () ]
+          [ Break.create
+              ~kind:Duplicate
+              ~provider_ref
+              ~internal:first.amount
+              ~first_seen
+              ()
+          ]
         else []
       in
       let main =
@@ -261,7 +280,9 @@ let match_transactions ?(timing_days = 1) ~business_date ours theirs =
               ()
           ]
         | None ->
-          let kind : Break.Kind.t = if recent first.booked_on then Timing else Missing_external in
+          let kind : Break.Kind.t =
+            if recent first.booked_on then Timing else Missing_external
+          in
           [ Break.create ~kind ~provider_ref ~internal:first.amount ~first_seen () ]
       in
       duplicate @ main)
@@ -272,14 +293,20 @@ let match_transactions ?(timing_days = 1) ~business_date ours theirs =
       if Map.mem ours_by provider_ref
       then None
       else (
-        let kind : Break.Kind.t = if recent ext.value_date then Timing else Missing_internal in
+        let kind : Break.Kind.t =
+          if recent ext.value_date then Timing else Missing_internal
+        in
         Some (Break.create ~kind ~provider_ref ~external_:ext.amount ~first_seen ())))
   in
   from_ours @ from_theirs
 ;;
 
 let carry_forward ~previous ~current =
-  let prev = String.Map.of_alist_reduce (List.map previous ~f:(fun (b : Break.t) -> b.id, b)) ~f:(fun a _ -> a) in
+  let prev =
+    String.Map.of_alist_reduce
+      (List.map previous ~f:(fun (b : Break.t) -> b.id, b))
+      ~f:(fun a _ -> a)
+  in
   let cur_ids = String.Set.of_list (List.map current ~f:(fun (b : Break.t) -> b.id)) in
   let merged =
     List.map current ~f:(fun (b : Break.t) ->
@@ -312,6 +339,5 @@ let ageing breaks ~today =
       | Open | Explained _ -> true)
   in
   List.map Break.Age.all ~f:(fun bucket ->
-    ( bucket
-    , List.count open_ ~f:(fun b -> Break.Age.equal (Break.age b ~today) bucket) ))
+    bucket, List.count open_ ~f:(fun b -> Break.Age.equal (Break.age b ~today) bucket))
 ;;

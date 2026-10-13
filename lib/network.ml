@@ -18,9 +18,7 @@ include Stable.V1
 let to_string t = Sexp.to_string (sexp_of_t t) |> String.lowercase
 
 let of_string s =
-  match
-    List.find all ~f:(fun t -> String.equal (to_string t) (String.lowercase s))
-  with
+  match List.find all ~f:(fun t -> String.equal (to_string t) (String.lowercase s)) with
   | Some t -> t
   | None -> raise_s [%message "unknown network" s]
 ;;

@@ -14,13 +14,18 @@ module Chart = struct
     { settlement =
         (fun rail currency ->
           Account_id.of_string
-            (sprintf "settlement:%s/%s" (Rail.to_string rail) (Money.Currency.to_string currency)))
+            (sprintf
+               "settlement:%s/%s"
+               (Rail.to_string rail)
+               (Money.Currency.to_string currency)))
     ; fee_income =
         (fun currency ->
-          Account_id.of_string (sprintf "income:fees/%s" (Money.Currency.to_string currency)))
+          Account_id.of_string
+            (sprintf "income:fees/%s" (Money.Currency.to_string currency)))
     ; fx_position =
         (fun currency ->
-          Account_id.of_string (sprintf "fx:position/%s" (Money.Currency.to_string currency)))
+          Account_id.of_string
+            (sprintf "fx:position/%s" (Money.Currency.to_string currency)))
     }
   ;;
 
@@ -44,8 +49,8 @@ let apply balances entries =
     Ledger.Balances.apply b { seq = Ledger.Balances.next_seq b; event = Posted entry })
 ;;
 
-(* Builds legs one after the other against a scratch copy of the balances, because a
-   later leg (the fee capture) depends on the state the earlier one leaves. *)
+(* Builds legs one after the other against a scratch copy of the balances, because a later
+   leg (the fee capture) depends on the state the earlier one leaves. *)
 let build balances legs =
   let open Or_error.Let_syntax in
   let%map _, rev =
@@ -116,7 +121,6 @@ let release ~event_id ~(t : Transfer.t) ~at balances =
 
 let currency (t : Transfer.t) = Amount.currency t.amount
 let settlement (chart : Chart.t) (t : Transfer.t) = chart.settlement t.rail (currency t)
-
 let fee_legs (t : Transfer.t) leg = if Amount.is_zero t.fee then [] else [ leg ]
 
 let deposit_legs chart ~event_id ~(t : Transfer.t) ~at =
@@ -156,9 +160,9 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
             ~at)
   | Out, (Submitted | Pending), (Failed _ | Rejected _ | Timed_out) ->
     [ release ~event_id ~t ~at ]
-  (* A settlement confirmed after the SCT Inst time-out: the hold is gone, so the
-     payment is booked as a fresh debit. It can fail if the customer has spent the
-     released funds meanwhile; the caller then has a case to open, not an entry. *)
+  (* A settlement confirmed after the SCT Inst time-out: the hold is gone, so the payment
+     is booked as a fresh debit. It can fail if the customer has spent the released funds
+     meanwhile; the caller then has a case to open, not an entry. *)
   | Out, Timed_out, Settled ->
     transfer_entry
       ~tag:"late-settlement"
@@ -189,8 +193,8 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
         t.amount
     ]
   | In, Pending, Settled -> deposit_legs chart ~event_id ~t ~at
-  (* A credited deposit whose block was orphaned: take the credit (and the fee) back
-     until the transaction confirms again. *)
+  (* A credited deposit whose block was orphaned: take the credit (and the fee) back until
+     the transaction confirms again. *)
   | In, Settled, Reorged ->
     fee_legs
       t
@@ -226,14 +230,14 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
          ~credit:t.account
          t.fee)
     @ [ transfer_entry
-        ~tag:"return"
-        ~event_id
-        ~t
-        ~at
-        ~debit:t.account
-        ~credit:(settlement chart t)
-        t.amount
-    ]
+          ~tag:"return"
+          ~event_id
+          ~t
+          ~at
+          ~debit:t.account
+          ~credit:(settlement chart t)
+          t.amount
+      ]
   (* Every other allowed transition moves no money: entering Awaiting_sca or Pending,
      giving up before the hold was placed, or a recall being requested or refused. *)
   | _ -> []

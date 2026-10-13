@@ -8,7 +8,10 @@ module Sepa_text = struct
     if String.is_empty s
     then Or_error.error_s [%message "empty field" field]
     else if String.length s > max_length
-    then Or_error.error_s [%message "field too long" field (max_length : int) ~length:(String.length s : int)]
+    then
+      Or_error.error_s
+        [%message
+          "field too long" field (max_length : int) ~length:(String.length s : int)]
     else if not (is_valid s)
     then Or_error.error_s [%message "characters outside the SEPA set" field s]
     else Ok ()
@@ -20,7 +23,9 @@ module Sepa_text = struct
     if String.is_prefix s ~prefix:"/"
        || String.is_suffix s ~suffix:"/"
        || String.is_substring s ~substring:"//"
-    then Or_error.error_s [%message "identifier with a leading, trailing or double slash" field s]
+    then
+      Or_error.error_s
+        [%message "identifier with a leading, trailing or double slash" field s]
     else Ok ()
   ;;
 end
@@ -44,7 +49,9 @@ module Uetr = struct
   let to_string t = t
 
   let create state =
-    let hex n = String.init n ~f:(fun _ -> "0123456789abcdef".[Random.State.int state 16]) in
+    let hex n =
+      String.init n ~f:(fun _ -> "0123456789abcdef".[Random.State.int state 16])
+    in
     sprintf
       "%s-%s-4%s-%c%s-%s"
       (hex 8)
@@ -87,12 +94,15 @@ module Payment_id = struct
 
   let generate ~transfer_id state =
     let cleaned =
-      String.map transfer_id ~f:(fun c -> if Sepa_text.allowed c && not (Char.equal c ' ') then c else '-')
+      String.map transfer_id ~f:(fun c ->
+        if Sepa_text.allowed c && not (Char.equal c ' ') then c else '-')
       |> String.substr_replace_all ~pattern:"//" ~with_:"/-"
       |> fun s -> String.prefix s 35
     in
     let trim_slash s =
-      let s = if String.is_prefix s ~prefix:"/" then "-" ^ String.drop_prefix s 1 else s in
+      let s =
+        if String.is_prefix s ~prefix:"/" then "-" ^ String.drop_prefix s 1 else s
+      in
       if String.is_suffix s ~suffix:"/" then String.drop_suffix s 1 ^ "-" else s
     in
     let end_to_end_id =
@@ -121,7 +131,9 @@ module Creditor_reference = struct
       else ((acc * 100) + (Char.to_int (Char.uppercase c) - Char.to_int 'A' + 10)) % 97)
   ;;
 
-  let normalize s = String.filter s ~f:(fun c -> not (Char.is_whitespace c)) |> String.uppercase
+  let normalize s =
+    String.filter s ~f:(fun c -> not (Char.is_whitespace c)) |> String.uppercase
+  ;;
 
   let of_string raw =
     let s = normalize raw in
@@ -140,7 +152,9 @@ module Creditor_reference = struct
 
   let of_body raw =
     let body = normalize raw in
-    if String.is_empty body || String.length body > 21 || not (String.for_all body ~f:Char.is_alphanum)
+    if String.is_empty body
+       || String.length body > 21
+       || not (String.for_all body ~f:Char.is_alphanum)
     then Or_error.error_s [%message "reference body must be 1-21 alphanumerics" raw]
     else of_string (sprintf "RF%02d%s" (98 - mod97 (body ^ "RF00")) body)
   ;;
@@ -235,7 +249,10 @@ module Transaction_status = struct
   [@@deriving bin_io, sexp, compare, equal, hash, enumerate]
 
   let of_string s =
-    match List.find all ~f:(fun t -> String.equal (Sexp.to_string (sexp_of_t t)) (String.uppercase s)) with
+    match
+      List.find all ~f:(fun t ->
+        String.equal (Sexp.to_string (sexp_of_t t)) (String.uppercase s))
+    with
     | Some t -> Ok t
     | None -> Or_error.error_s [%message "unknown transaction status" s]
   ;;

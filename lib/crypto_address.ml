@@ -25,7 +25,8 @@ let eip55 s =
       if i % 2 = 0 then byte lsr 4 else byte land 0xf
     in
     Some
-      ("0x" ^ String.mapi lower ~f:(fun i c -> if nibble i >= 8 then Char.uppercase c else c)))
+      ("0x"
+       ^ String.mapi lower ~f:(fun i c -> if nibble i >= 8 then Char.uppercase c else c)))
 ;;
 
 let err network raw why =
@@ -60,7 +61,8 @@ let create (network : Network.t) raw =
     (match String.chop_prefix raw ~prefix:"0x", eip55 raw with
      | Some body, Some canonical ->
        let single_case =
-         String.equal body (String.lowercase body) || String.equal body (String.uppercase body)
+         String.equal body (String.lowercase body)
+         || String.equal body (String.uppercase body)
        in
        if single_case || String.equal raw canonical
        then Ok { network; address = canonical }

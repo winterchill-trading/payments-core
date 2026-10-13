@@ -37,6 +37,6 @@ val is_instant : t -> bool
     On-chain, Lightning and intraledger payments are final once settled. *)
 val is_returnable : t -> bool
 
-(** How long after submission a payment on this rail normally settles. A transfer
-    still pending after this span is worth a look; it is not failed automatically. *)
+(** How long after submission a payment on this rail normally settles. A transfer still
+    pending after this span is worth a look; it is not failed automatically. *)
 val expected_settlement : t -> Time_ns.Span.t

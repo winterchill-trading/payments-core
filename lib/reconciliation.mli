@@ -4,8 +4,8 @@
     reference). Neither fixes anything; each difference is a {!Diff.t} for a person or a
     job to resolve, typically by booking a missed provider event.
 
-    Balances are compared with the ledger state the caller passes. For a report "as of"
-    an earlier time, fold the journal up to that time first. *)
+    Balances are compared with the ledger state the caller passes. For a report "as of" an
+    earlier time, fold the journal up to that time first. *)
 
 open! Core
 
@@ -48,16 +48,17 @@ module Diff : sig
     | Unreported_balance of
         { account : Ledger.Account_id.t
         ; ledger : Money.Amount.t
-        }
-    (** a non-zero ledger balance in scope the provider did not report *)
+        } (** a non-zero ledger balance in scope the provider did not report *)
     | Status_mismatch of
         { transfer : Transfer.Id.t
         ; provider_ref : string
         ; ledger : Transfer.Status.t
         ; provider : Transfer.Status.t
         }
-    | Unknown_transfer of { provider_ref : string; provider : Transfer.Status.t }
-    (** the provider has it, we do not *)
+    | Unknown_transfer of
+        { provider_ref : string
+        ; provider : Transfer.Status.t
+        } (** the provider has it, we do not *)
     | Missing_at_provider of
         { transfer : Transfer.Id.t
         ; provider_ref : string
@@ -80,10 +81,10 @@ val transfers : Transfer.t list -> Reported_transfer.t list -> Diff.t list
 
 (** {2 Transaction matching and breaks}
 
-    The daily job: match our booked transactions with the provider's on the provider
-    id, record every difference as a {!Break}, carry breaks across runs keeping the day
-    they were first seen, and age them in business days. A break is resolved only by
-    an adjustment entry in the ledger, made by one operator and approved by another. *)
+    The daily job: match our booked transactions with the provider's on the provider id,
+    record every difference as a {!Break}, carry breaks across runs keeping the day they
+    were first seen, and age them in business days. A break is resolved only by an
+    adjustment entry in the ledger, made by one operator and approved by another. *)
 
 module Internal_tx : sig
   type t =
@@ -150,10 +151,15 @@ module Break : sig
 
   val explain : t -> string -> t
 
-  (** Resolves with a booked adjustment entry whose reference names the break id.
-      Fails when maker and checker are the same person or the entry does not
-      reference the break. *)
-  val resolve : t -> adjustment:Ledger.Entry.t -> maker:string -> checker:string -> t Or_error.t
+  (** Resolves with a booked adjustment entry whose reference names the break id. Fails
+      when maker and checker are the same person or the entry does not reference the
+      break. *)
+  val resolve
+    :  t
+    -> adjustment:Ledger.Entry.t
+    -> maker:string
+    -> checker:string
+    -> t Or_error.t
 end
 
 (** Breaks for one business day. A side missing for at most [timing_days] business days
@@ -165,10 +171,10 @@ val match_transactions
   -> External_tx.t list
   -> Break.t list
 
-(** Merges a new run into the open breaks: a break seen before keeps its [first_seen]
-    and status (a [Timing] break that became a missing one keeps its date); a [Timing]
-    break absent from the new run has cleared by itself and is dropped; other open
-    breaks stay until resolved, even when the run no longer reports them. *)
+(** Merges a new run into the open breaks: a break seen before keeps its [first_seen] and
+    status (a [Timing] break that became a missing one keeps its date); a [Timing] break
+    absent from the new run has cleared by itself and is dropped; other open breaks stay
+    until resolved, even when the run no longer reports them. *)
 val carry_forward : previous:Break.t list -> current:Break.t list -> Break.t list
 
 (** Open breaks per age bucket. *)

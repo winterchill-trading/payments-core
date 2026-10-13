@@ -69,7 +69,9 @@ module Quote = struct
     let%bind () =
       if Amount.is_positive net
       then Ok ()
-      else Or_error.error_s [%message "fee exceeds the amount" (sell : Amount.t) (fee : Amount.t)]
+      else
+        Or_error.error_s
+          [%message "fee exceeds the amount" (sell : Amount.t) (fee : Amount.t)]
     in
     let customer_price =
       Q.(Money.Rate.price market * (one - (of_int spread_bps / of_int 10_000)))
@@ -88,9 +90,18 @@ module Quote = struct
     let%map () =
       if Amount.is_positive buy
       then Ok ()
-      else Or_error.error_s [%message "amount too small to buy anything" (sell : Amount.t)]
+      else
+        Or_error.error_s [%message "amount too small to buy anything" (sell : Amount.t)]
     in
-    { id; sell; fee; buy; market; spread_bps; created_at = now; expires_at = Time_ns.add now ttl }
+    { id
+    ; sell
+    ; fee
+    ; buy
+    ; market
+    ; spread_bps
+    ; created_at = now
+    ; expires_at = Time_ns.add now ttl
+    }
   ;;
 
   let effective_price t = Q.(Amount.to_q t.buy / Amount.to_q t.sell)
@@ -101,7 +112,12 @@ let execute (chart : Booking.Chart.t) balances (q : Quote.t) ~from_ ~to_ ~event_
   let open Or_error.Let_syntax in
   let%bind () =
     if Quote.is_expired q ~now
-    then Or_error.error_s [%message "quote expired" ~id:(q.id : Id.t) ~expires_at:(q.expires_at : Time_ns.Alternate_sexp.t)]
+    then
+      Or_error.error_s
+        [%message
+          "quote expired"
+            ~id:(q.id : Id.t)
+            ~expires_at:(q.expires_at : Time_ns.Alternate_sexp.t)]
     else Ok ()
   in
   let sell_currency = Amount.currency q.sell in

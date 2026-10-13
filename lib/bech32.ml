@@ -63,7 +63,9 @@ let decode ?(max_length = 90) s =
   let len = String.length s in
   let lower = String.lowercase s in
   let mixed = (not (String.equal s lower)) && not (String.equal s (String.uppercase s)) in
-  let printable = String.for_all s ~f:(fun c -> Char.to_int c >= 33 && Char.to_int c <= 126) in
+  let printable =
+    String.for_all s ~f:(fun c -> Char.to_int c >= 33 && Char.to_int c <= 126)
+  in
   match String.rindex lower '1' with
   | None -> None
   | Some pos when mixed || (not printable) || pos < 1 || pos + 7 > len || len > max_length
@@ -104,7 +106,9 @@ let convert_bits values ~from ~to_ ~pad =
         acc land ((1 lsl !bits) - 1), !bits, !out)
     in
     if pad
-    then Some (List.rev (if bits > 0 then ((acc lsl (to_ - bits)) land maxv) :: out else out))
+    then
+      Some
+        (List.rev (if bits > 0 then ((acc lsl (to_ - bits)) land maxv) :: out else out))
     else if bits >= from || (acc lsl (to_ - bits)) land maxv <> 0
     then None
     else Some (List.rev out))

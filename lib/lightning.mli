@@ -1,9 +1,9 @@
 (** Lightning payment targets: BOLT 11 invoices, LNURL (LUD-01) and Lightning addresses
     (LUD-16).
 
-    Invoices are checked for Bech32 integrity, network, amount and the tagged fields
-    this library needs. The node signature is not verified here (that needs secp256k1
-    public key recovery); the provider paying the invoice verifies it. *)
+    Invoices are checked for Bech32 integrity, network, amount and the tagged fields this
+    library needs. The node signature is not verified here (that needs secp256k1 public
+    key recovery); the provider paying the invoice verifies it. *)
 
 open! Core
 

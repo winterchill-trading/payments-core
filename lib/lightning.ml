@@ -1,6 +1,8 @@
 open! Core
 
-let hex_of_bytes bytes = String.concat_map bytes ~f:(fun c -> sprintf "%02x" (Char.to_int c))
+let hex_of_bytes bytes =
+  String.concat_map bytes ~f:(fun c -> sprintf "%02x" (Char.to_int c))
+;;
 
 let bytes_of_groups groups =
   Bech32.convert_bits groups ~from:5 ~to_:8 ~pad:false
@@ -94,7 +96,9 @@ module Invoice = struct
     let%bind network, amount_msat = parse_hrp hrp in
     let n = List.length data in
     let%bind () =
-      if n >= 7 + signature_groups then Ok () else Or_error.error_string "invoice too short"
+      if n >= 7 + signature_groups
+      then Ok ()
+      else Or_error.error_string "invoice too short"
     in
     let timestamp = int_of_groups (List.take data 7) in
     let tagged = List.sub data ~pos:7 ~len:(n - 7 - signature_groups) in
@@ -188,6 +192,7 @@ module Target = struct
   let pay_url = function
     | Invoice _ -> None
     | Lnurl url -> Some url
-    | Address { user; domain } -> Some (sprintf "https://%s/.well-known/lnurlp/%s" domain user)
+    | Address { user; domain } ->
+      Some (sprintf "https://%s/.well-known/lnurlp/%s" domain user)
   ;;
 end

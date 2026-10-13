@@ -1,15 +1,13 @@
-(** Currency swaps (EUR to BTC, USDC to EUR, ...) against the institution's own
-    inventory.
+(** Currency swaps (EUR to BTC, USDC to EUR, ...) against the institution's own inventory.
 
-    A {!Quote} fixes what the customer gives and gets for a short time. Executing it
-    books three entries, one currency each: the sell leg (customer to the FX position in
-    the sold currency), the fee (customer to fee income, in the sold currency) and the
-    buy leg (FX position to customer in the bought currency). Every amount is exact;
-    the bought amount is rounded down to a minor unit, so rounding never favours the
-    customer at the institution's expense or the reverse by more than one minor unit. *)
+    A {!Quote} fixes what the customer gives and gets for a short time. Executing it books
+    three entries, one currency each: the sell leg (customer to the FX position in the
+    sold currency), the fee (customer to fee income, in the sold currency) and the buy leg
+    (FX position to customer in the bought currency). Every amount is exact; the bought
+    amount is rounded down to a minor unit, so rounding never favours the customer at the
+    institution's expense or the reverse by more than one minor unit. *)
 
 open! Core
-
 module Id : Opaque_id.S
 
 module Quote : sig
@@ -25,11 +23,11 @@ module Quote : sig
     }
   [@@deriving sexp_of, compare, equal]
 
-  (** [market] may be quoted either way round; it is inverted when its base is the
-      bought currency. The customer price is the market price less [spread_bps], and
-      [fee] (default none) is charged on [sell]. Defaults: 30 second validity, no
-      spread. Fails when the rate does not connect the two currencies, the amount is not
-      positive, or the fee eats the whole amount. *)
+  (** [market] may be quoted either way round; it is inverted when its base is the bought
+      currency. The customer price is the market price less [spread_bps], and [fee]
+      (default none) is charged on [sell]. Defaults: 30 second validity, no spread. Fails
+      when the rate does not connect the two currencies, the amount is not positive, or
+      the fee eats the whole amount. *)
   val create
     :  id:Id.t
     -> market:Money.Rate.t

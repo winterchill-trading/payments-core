@@ -6,8 +6,12 @@ module T = struct
   let of_string raw =
     let s = String.uppercase (String.strip raw) in
     let len = String.length s in
-    let letters i j = String.for_all (String.sub s ~pos:i ~len:(j - i)) ~f:Char.is_alpha in
-    let alnum i j = String.for_all (String.sub s ~pos:i ~len:(j - i)) ~f:Char.is_alphanum in
+    let letters i j =
+      String.for_all (String.sub s ~pos:i ~len:(j - i)) ~f:Char.is_alpha
+    in
+    let alnum i j =
+      String.for_all (String.sub s ~pos:i ~len:(j - i)) ~f:Char.is_alphanum
+    in
     if (len = 8 || len = 11) && letters 0 6 && alnum 6 len
     then Ok s
     else Or_error.error_s [%message "invalid BIC" (raw : string)]

@@ -127,8 +127,10 @@ module Kind = struct
 end
 
 let kinds : t -> Kind.t list = function
-  | AB05 | AB06 | AB07 | AB08 | AB09 | AB10 | AM23 | CNOR | DNOR | FF01 | TM01 -> [ Reject ]
-  | AC01 | AG02 | AM05 | ERIN | MS03 | RC01 | RR01 | RR02 | RR03 | RR04 -> [ Reject; Return ]
+  | AB05 | AB06 | AB07 | AB08 | AB09 | AB10 | AM23 | CNOR | DNOR | FF01 | TM01 ->
+    [ Reject ]
+  | AC01 | AG02 | AM05 | ERIN | MS03 | RC01 | RR01 | RR02 | RR03 | RR04 ->
+    [ Reject; Return ]
   | AC06 | AG01 | BE04 | MD07 | MS02 -> [ Reject; Return ]
   | AC04 -> [ Reject; Return; Answer ]
   | FOCR -> [ Return ]
