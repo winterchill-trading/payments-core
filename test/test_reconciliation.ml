@@ -78,3 +78,67 @@ let%expect_test "transfers" =
      (Missing_at_provider (transfer tr-3) (provider_ref p-3)))
     |}]
 ;;
+
+let%expect_test "breaks, carry-forward, ageing and maker-checker resolution" =
+  let d = Date.of_string in
+  let ours : Reconciliation.Internal_tx.t list =
+    [ { provider_ref = "p-1"; amount = eur "10.00"; booked_on = d "2026-10-12" }
+    ; { provider_ref = "p-2"; amount = eur "20.00"; booked_on = d "2026-10-12" }
+    ; { provider_ref = "p-3"; amount = eur "30.00"; booked_on = d "2026-10-13" }
+    ; { provider_ref = "p-4"; amount = eur "40.00"; booked_on = d "2026-10-07" }
+    ; { provider_ref = "p-5"; amount = eur "5.00"; booked_on = d "2026-10-12" }
+    ; { provider_ref = "p-5"; amount = eur "5.00"; booked_on = d "2026-10-12" }
+    ]
+  in
+  let theirs : Reconciliation.External_tx.t list =
+    [ { provider_ref = "p-1"; amount = eur "10.00"; value_date = d "2026-10-12" }
+    ; { provider_ref = "p-2"; amount = eur "19.50"; value_date = d "2026-10-12" }
+    ; { provider_ref = "p-5"; amount = eur "5.00"; value_date = d "2026-10-12" }
+    ; { provider_ref = "p-9"; amount = eur "9.00"; value_date = d "2026-10-05" }
+    ]
+  in
+  let day1 = Reconciliation.match_transactions ~business_date:(d "2026-10-13") ours theirs in
+  List.iter day1 ~f:(fun b -> print_s [%sexp (b.id : string), (b.first_seen : Date.t)]);
+  (* next day: p-3 still missing at the provider, now past the timing window *)
+  let day2 =
+    Reconciliation.match_transactions ~business_date:(d "2026-10-15") ours theirs
+    |> fun current -> Reconciliation.carry_forward ~previous:day1 ~current
+  in
+  print_endline "-- day 2";
+  List.iter day2 ~f:(fun b -> print_s [%sexp (b.id : string), (b.first_seen : Date.t)]);
+  print_s
+    [%sexp
+      (Reconciliation.ageing day2 ~today:(d "2026-10-23") : (Reconciliation.Break.Age.t * int) list)];
+  let mismatch = List.find_exn day2 ~f:(fun b -> String.equal b.id "Amount_mismatch:p-2") in
+  let adjustment =
+    Ledger.Entry.create
+      ~idempotency_key:(Ledger.Idempotency_key.of_string "adj-1")
+      ~kind:(Transfer "adjustment")
+      ~reference:"Amount_mismatch:p-2"
+      ~effective_at:t0
+      ~recorded_at:t0
+      [ Ledger.Posting.debit (account "expense:rounding/eur") (eur "0.50")
+      ; Ledger.Posting.credit (account "settlement:sepa_credit/EUR") (eur "0.50")
+      ]
+    |> Or_error.ok_exn
+  in
+  let show r = print_s [%sexp (Result.map r ~f:(fun (b : Reconciliation.Break.t) -> b.status) : Reconciliation.Break.Status.t Or_error.t)] in
+  show (Reconciliation.Break.resolve mismatch ~adjustment ~maker:"op-1" ~checker:"op-1");
+  show (Reconciliation.Break.resolve mismatch ~adjustment ~maker:"op-1" ~checker:"op-2");
+  [%expect {|
+    (Amount_mismatch:p-2 2026-10-13)
+    (Timing:p-3 2026-10-13)
+    (Missing_external:p-4 2026-10-13)
+    (Duplicate:p-5 2026-10-13)
+    (Missing_internal:p-9 2026-10-13)
+    -- day 2
+    (Amount_mismatch:p-2 2026-10-13)
+    (Missing_external:p-3 2026-10-13)
+    (Missing_external:p-4 2026-10-13)
+    (Duplicate:p-5 2026-10-13)
+    (Missing_internal:p-9 2026-10-13)
+    ((Days_0_1 0) (Days_2_5 0) (Over_5 5))
+    (Error ("maker and checker must differ" op-1))
+    (Ok (Resolved (adjustment adj-1) (maker op-1) (checker op-2)))
+    |}]
+;;
