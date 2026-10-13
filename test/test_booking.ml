@@ -11,6 +11,7 @@ let funded amount =
     Transfer.incoming
       ~id:(Transfer.Id.of_string "in-1")
       ~rail:Sepa_credit
+      ~details:(sepa_details ())
       ~account:customer
       ~from:(External { name = "Employer"; detail = "DE89370400440532013000" })
       ~amount:(eur amount)
@@ -50,7 +51,7 @@ let%expect_test "outgoing SEPA: hold, settle with a fee, then returned" =
   |> step ~event_id:"evt-1" ~sec:1 Submitted
   |> step ~event_id:"evt-2" ~sec:2 Pending
   |> step ~event_id:"evt-3" ~sec:3 Settled
-  |> step ~event_id:"evt-4" ~sec:4 Returned
+  |> step ~event_id:"evt-4" ~sec:4 (Returned AC04)
   |> finish;
   [%expect {|
     evt-in-1/deposit  (Transfer deposit)  ref=in-1
@@ -82,7 +83,7 @@ let%expect_test "outgoing SEPA: failed after submission releases the hold" =
   let b = funded "100.00" in
   (b, draft ())
   |> step ~event_id:"evt-1" ~sec:1 Submitted
-  |> step ~event_id:"evt-2" ~sec:2 (Failed Beneficiary_rejected)
+  |> step ~event_id:"evt-2" ~sec:2 (Rejected AC01)
   |> finish;
   [%expect {|
     evt-in-1/deposit  (Transfer deposit)  ref=in-1
@@ -92,7 +93,7 @@ let%expect_test "outgoing SEPA: failed after submission releases the hold" =
     evt-1/hold  (Hold_place transfer:tr-1)  ref=tr-1
       debit  customer:1/eur                           25.50 EUR
       credit customer:1/eur/pending                   25.50 EUR
-    -- Failed
+    -- Rejected
     evt-2/release  (Hold_release transfer:tr-1)  ref=tr-1
       debit  customer:1/eur/pending                   25.50 EUR
       credit customer:1/eur                           25.50 EUR
@@ -127,6 +128,7 @@ let%expect_test "incoming pending then settled with a fee, then returned" =
     Transfer.incoming
       ~id:(Transfer.Id.of_string "in-2")
       ~rail:Sepa_credit
+      ~details:(sepa_details ())
       ~account:customer
       ~from:(External { name = "Payer"; detail = "DE89370400440532013000" })
       ~amount:(eur "40.00")
@@ -139,7 +141,7 @@ let%expect_test "incoming pending then settled with a fee, then returned" =
   print_entries (Booking.created chart (ledger ()) t ~event_id:"evt-0" ~at:t0 |> Or_error.ok_exn);
   (ledger (), t)
   |> step ~event_id:"evt-1" ~sec:1 Settled
-  |> step ~event_id:"evt-2" ~sec:2 Returned
+  |> step ~event_id:"evt-2" ~sec:2 (Returned AC04)
   |> finish;
   [%expect {|
     -- Settled

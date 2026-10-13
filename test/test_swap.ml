@@ -12,6 +12,7 @@ let funded_ledger eur_amount =
     Transfer.incoming
       ~id:(Transfer.Id.of_string "in-1")
       ~rail:Sepa_instant
+      ~details:(sepa_details ())
       ~account:customer
       ~from:(External { name = "Payer"; detail = "test" })
       ~amount:(eur eur_amount)

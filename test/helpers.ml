@@ -17,8 +17,32 @@ let beneficiary ?(rail = Rail.Sepa_credit) ?(raw = "DE89370400440532013000") () 
   |> Or_error.ok_exn
 ;;
 
+(* The customer's own IBAN: a German BBAN with check digits computed. *)
+let debtor_iban =
+  let bban = "100100100123456789" in
+  Iban.of_string_exn ("DE" ^ Iban.check_digits ~country:"DE" ~bban ^ bban)
+;;
+
+let sepa_details ?(end_to_end_id = "E2E-0001") ?(creditor_iban = "DE89370400440532013000") ()
+  =
+  let party name iban : Iso20022.Party.t = { name; iban; bic = None; address = None } in
+  Transfer.Details.Sepa
+    (Sepa.Details.create
+       ~payment_id:(Iso20022.Payment_id.create ~end_to_end_id () |> Or_error.ok_exn)
+       ~debtor:(party "Customer One" debtor_iban)
+       ~creditor:(party "Ada Example" (Iban.of_string_exn creditor_iban))
+       ~remittance:(Iso20022.Remittance.unstructured "invoice 42" |> Or_error.ok_exn)
+       ())
+;;
+
 let draft ?(rail = Rail.Sepa_credit) ?(amount = "25.00") ?(fee = "0.50") () =
+  let details =
+    match rail with
+    | Sepa_credit | Sepa_instant -> Some (sepa_details ())
+    | _ -> None
+  in
   Transfer.draft
+    ?details
     ~id:(Transfer.Id.of_string "tr-1")
     ~rail
     ~account:(account "customer:1/eur")

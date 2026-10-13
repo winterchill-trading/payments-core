@@ -9,8 +9,12 @@ let candidates : Transfer.Status.t list =
   ; Submitted
   ; Pending
   ; Settled
-  ; Failed Beneficiary_rejected
-  ; Returned
+  ; Rejected AC01
+  ; Failed Insufficient_funds
+  ; Returned AC04
+  ; Recall_requested DUPL
+  ; Recall_refused NOAS
+  ; Recalled
   ; Cancelled
   ]
 ;;
@@ -42,12 +46,19 @@ let gen =
 
 let cents n = Money.Amount.of_minor_units_int Money.Currency.eur n
 
+let details_for (rail : Rail.t) =
+  match rail with
+  | Sepa_credit | Sepa_instant -> Some (sepa_details ())
+  | _ -> None
+;;
+
 let fund b ~rail cents_ =
   if cents_ = 0
   then b
   else (
     let t =
       Transfer.incoming
+        ?details:(details_for rail)
         ~id:(Transfer.Id.of_string "funding")
         ~rail
         ~account:customer
@@ -74,6 +85,7 @@ let start case =
       | _ -> "DE89370400440532013000"
     in
     Transfer.draft
+      ?details:(details_for case.rail)
       ~id:(Transfer.Id.of_string "tr")
       ~rail:case.rail
       ~account:customer
@@ -85,6 +97,7 @@ let start case =
     |> Or_error.ok_exn
   | In ->
     Transfer.incoming
+      ?details:(details_for case.rail)
       ~id:(Transfer.Id.of_string "tr")
       ~rail:case.rail
       ~account:customer
@@ -136,7 +149,7 @@ let run case =
           let to_ = Transfer.Status.Failed Insufficient_funds in
           Some (to_, Booking.transition chart b t ~to_ ~event_id ~at |> Or_error.ok_exn)
         (* Returning an incoming payment the customer already spent is refused too. *)
-        | Error _, Returned -> None
+        | Error _, (Returned _ | Recalled) -> None
         | Error e, _ -> Error.raise e
       in
       match booked with

@@ -13,6 +13,7 @@ let order ?until () =
     ~rail:Sepa_credit
     ~amount:(eur "750.00")
     ~reference:"rent"
+    ~details:(sepa_details ())
     ~schedule:(Monthly { day = 31 })
     ~start:(Date.of_string "2026-10-13")
     ?until
@@ -27,10 +28,16 @@ let tick t now =
       (Sexp.to_string [%sexp (t.status : Standing_order.Status.t)]);
     t
   | Some (t, draft) ->
+    let e2e =
+      match draft.details with
+      | Sepa d -> d.payment_id.end_to_end_id
+      | _ -> "-"
+    in
     printf
-      "%s  draft %s %s -> next %s (%s)\n"
+      "%s  draft %s e2e=%s %s -> next %s (%s)\n"
       now
       (Transfer.Id.to_string draft.id)
+      e2e
       (Money.Amount.to_string draft.amount)
       (Date.to_string t.next_run)
       (Sexp.to_string [%sexp (t.status : Standing_order.Status.t)]);
@@ -52,11 +59,11 @@ let%expect_test "month-end rent with a pause and an end date" =
   print_s [%message (t.runs : int) (t.last_run : Date.t option)];
   [%expect {|
     2026-10-30  not due (next 2026-10-31, Active)
-    2026-10-31  draft so-1:2026-10-31 750.00 EUR -> next 2026-11-30 (Active)
+    2026-10-31  draft so-1:2026-10-31 e2e=so-1-2026-10-31 750.00 EUR -> next 2026-11-30 (Active)
     2026-10-31  not due (next 2026-11-30, Active)
     2026-11-30  not due (next 2026-11-30, Paused)
-    2026-12-31  draft so-1:2026-12-31 750.00 EUR -> next 2027-01-31 (Active)
-    2027-02-28  draft so-1:2027-02-28 750.00 EUR -> next 2027-03-31 (Finished)
+    2026-12-31  draft so-1:2026-12-31 e2e=so-1-2026-12-31 750.00 EUR -> next 2027-01-31 (Active)
+    2027-02-28  draft so-1:2027-02-28 e2e=so-1-2027-02-28 750.00 EUR -> next 2027-03-31 (Finished)
     2027-03-31  not due (next 2027-03-31, Finished)
     ((t.runs 3) (t.last_run (2027-02-28)))
     |}]
@@ -73,6 +80,7 @@ let%expect_test "cancel and validation" =
       ~beneficiary:(beneficiary ())
       ~rail:Sepa_credit
       ~amount:(eur "1.00")
+      ~details:(sepa_details ())
       ~schedule:(Monthly { day = 32 })
       ~start:(Date.of_string "2026-10-13")
       ()

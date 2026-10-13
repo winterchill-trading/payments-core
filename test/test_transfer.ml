@@ -18,11 +18,15 @@ let%expect_test "allowed transitions table" =
   [%expect {|
     Draft         -> Awaiting_sca, Submitted, Cancelled, Failed
     Awaiting_sca  -> Submitted, Cancelled, Failed
-    Submitted     -> Pending, Settled, Failed
-    Pending       -> Settled, Failed
-    Settled       -> Returned
+    Submitted     -> Pending, Settled, Rejected, Failed
+    Pending       -> Settled, Rejected, Failed
+    Settled       -> Returned, Recall_requested
+    Recall_requested -> Recalled, Recall_refused, Returned
+    Rejected      ->
     Failed        ->
     Returned      ->
+    Recall_refused ->
+    Recalled      ->
     Cancelled     ->
     |}]
 ;;
@@ -36,7 +40,7 @@ let%expect_test "outgoing SEPA lifecycle with SCA and a return" =
   let t = step t Pending 6 in
   let t = step t Pending 7 in
   let t = step t Settled 3600 in
-  let t = step t Returned 7200 in
+  let t = step t (Returned MS02) 7200 in
   let t = step t Settled 7300 in
   print_s
     [%message
@@ -50,16 +54,16 @@ let%expect_test "outgoing SEPA lifecycle with SCA and a return" =
      ("transition not allowed" (transfer tr-1) (from Pending) (to_ Pending)
       (rail Sepa_credit)))
     (ok (status Settled))
-    (ok (status Returned))
+    (ok (status (Returned MS02)))
     (refused
-     ("transition not allowed" (transfer tr-1) (from Returned) (to_ Settled)
-      (rail Sepa_credit)))
+     ("transition not allowed" (transfer tr-1) (from (Returned MS02))
+      (to_ Settled) (rail Sepa_credit)))
     (("Transfer.is_terminal t" true) ("Transfer.total_debit t" "25.50 EUR")
      (t.provider_ref (prov-77))
      (history
       ((Draft "2026-10-13 09:00:00Z") (Awaiting_sca "2026-10-13 09:00:01Z")
        (Submitted "2026-10-13 09:00:05Z") (Pending "2026-10-13 09:00:06Z")
-       (Settled "2026-10-13 10:00:00Z") (Returned "2026-10-13 11:00:00Z"))))
+       (Settled "2026-10-13 10:00:00Z") ((Returned MS02) "2026-10-13 11:00:00Z"))))
     |}]
 ;;
 
@@ -78,14 +82,14 @@ let%expect_test "final rails: on-chain cannot return, settled is terminal" =
   in
   let t = step t Submitted 1 in
   let t = step t Settled 2 in
-  let t = step t Returned 3 in
+  let t = step t (Returned MS02) 3 in
   print_s [%message (Transfer.is_terminal t : bool)];
   [%expect {|
     (ok (status Submitted))
     (ok (status Settled))
     (refused
-     ("transition not allowed" (transfer tr-ln) (from Settled) (to_ Returned)
-      (rail Lightning)))
+     ("transition not allowed" (transfer tr-ln) (from Settled)
+      (to_ (Returned MS02)) (rail Lightning)))
     ("Transfer.is_terminal t" true)
     |}]
 ;;
@@ -94,6 +98,7 @@ let%expect_test "draft validation" =
   let try_ ?(rail = Rail.Sepa_credit) amount fee =
     match
       Transfer.draft
+        ~details:(sepa_details ())
         ~id:(Transfer.Id.of_string "tr-x")
         ~rail
         ~account:(account "customer:1/eur")
@@ -127,6 +132,7 @@ let%expect_test "incoming fee may not exceed the amount" =
   Transfer.incoming
     ~id:(Transfer.Id.of_string "in-x")
     ~rail:Sepa_credit
+    ~details:(sepa_details ())
     ~account:(account "customer:1/eur")
     ~from:(External { name = "Payer"; detail = "test" })
     ~amount:(eur "0.01")

@@ -10,6 +10,7 @@ let ledger_with_pending_payment () =
     Transfer.incoming
       ~id:(Transfer.Id.of_string "in-1")
       ~rail:Sepa_credit
+      ~details:(sepa_details ())
       ~account:customer
       ~from:(External { name = "Payer"; detail = "test" })
       ~amount:(eur "100.00")
