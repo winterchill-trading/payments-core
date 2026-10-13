@@ -1,0 +1,7 @@
+(executable
+ (name payments)
+ (public_name payments)
+ (package payments-core)
+ (libraries payments-core core core_unix.command_unix money ledger)
+ (preprocess
+  (pps ppx_jane)))
