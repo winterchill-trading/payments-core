@@ -1,5 +1,6 @@
 (** Provider-neutral payment rails, transfer state machines and ledger booking. *)
 
+module Opaque_id = Opaque_id
 module Network = Network
 module Rail = Rail
 module Iban = Iban
@@ -8,3 +9,4 @@ module Base58 = Base58
 module Bech32 = Bech32
 module Crypto_address = Crypto_address
 module Lightning = Lightning
+module Beneficiary = Beneficiary
