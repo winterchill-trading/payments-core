@@ -61,20 +61,28 @@ module Payment_id = struct
     { end_to_end_id : string
     ; instruction_id : string option
     ; uetr : Uetr.t option
+    ; tx_id : string option
+    ; msg_id : string option
+    ; pmt_inf_id : string option
     }
   [@@deriving bin_io, sexp, compare, equal, hash]
 
   let not_provided = "NOTPROVIDED"
 
-  let create ~end_to_end_id ?instruction_id ?uetr () =
+  let create ~end_to_end_id ?instruction_id ?uetr ?tx_id ?msg_id ?pmt_inf_id () =
     let open Or_error.Let_syntax in
     let%bind () = Sepa_text.check_id ~field:"end_to_end_id" end_to_end_id in
     let%map () =
-      match instruction_id with
-      | None -> Ok ()
-      | Some id -> Sepa_text.check_id ~field:"instruction_id" id
+      [ "instruction_id", instruction_id
+      ; "tx_id", tx_id
+      ; "msg_id", msg_id
+      ; "pmt_inf_id", pmt_inf_id
+      ]
+      |> List.filter_map ~f:(fun (field, id) ->
+        Option.map id ~f:(Sepa_text.check_id ~field))
+      |> Or_error.all_unit
     in
-    { end_to_end_id; instruction_id; uetr }
+    { end_to_end_id; instruction_id; uetr; tx_id; msg_id; pmt_inf_id }
   ;;
 end
 

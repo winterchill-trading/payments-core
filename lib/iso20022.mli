@@ -33,10 +33,21 @@ module Payment_id : sig
         characters; ["NOTPROVIDED"] when the customer gave none *)
     ; instruction_id : string option (** point-to-point id between two agents *)
     ; uetr : Uetr.t option
+    ; tx_id : string option (** interbank transaction id, from the provider *)
+    ; msg_id : string option (** message id of the pain.001 / pacs.008 *)
+    ; pmt_inf_id : string option (** payment information id of the pain.001 batch *)
     }
   [@@deriving bin_io, sexp, compare, equal, hash]
 
-  val create : end_to_end_id:string -> ?instruction_id:string -> ?uetr:Uetr.t -> unit -> t Or_error.t
+    val create
+    :  end_to_end_id:string
+    -> ?instruction_id:string
+    -> ?uetr:Uetr.t
+    -> ?tx_id:string
+    -> ?msg_id:string
+    -> ?pmt_inf_id:string
+    -> unit
+    -> t Or_error.t
   val not_provided : string
 end
 
