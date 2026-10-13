@@ -20,3 +20,4 @@ module Swap = Swap
 module Reconciliation = Reconciliation
 module Iso_reason = Iso_reason
 module Iso20022 = Iso20022
+module Travel_rule = Travel_rule
