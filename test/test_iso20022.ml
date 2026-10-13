@@ -74,3 +74,32 @@ let%expect_test "addresses" =
     (Error "at most two address lines")
     |}]
 ;;
+
+let%expect_test "generated end-to-end ids always pass the SEPA checks" =
+  let state = Random.State.make [| 7 |] in
+  Quickcheck.test String.quickcheck_generator ~sexp_of:String.sexp_of_t ~f:(fun transfer_id ->
+    let id = Payment_id.generate ~transfer_id state in
+    ignore
+      (Payment_id.create ~end_to_end_id:id.end_to_end_id ?uetr:id.uetr () |> Or_error.ok_exn
+       : Payment_id.t));
+  let id = Payment_id.generate ~transfer_id:"/tr//2026:ö 1/" state in
+  print_endline id.end_to_end_id;
+  [%expect {| -tr/-2026:---1- |}]
+;;
+
+let%expect_test "reason code kinds" =
+  List.iter Iso_reason.[ AC04; FOCR; DUPL; CUST; AB05; AM02 ] ~f:(fun r ->
+    print_s
+      [%message
+        (Iso_reason.to_code r)
+          ~kinds:(Iso_reason.kinds r : Iso_reason.Kind.t list)
+          ~customer_error:(Iso_reason.is_customer_error r : bool)]);
+  [%expect {|
+    (AC04 (kinds (Reject Return Answer)) (customer_error true))
+    (FOCR (kinds (Return)) (customer_error false))
+    (DUPL (kinds (Recall)) (customer_error false))
+    (CUST (kinds (Rfro Answer)) (customer_error false))
+    (AB05 (kinds (Reject)) (customer_error false))
+    (AM02 (kinds ()) (customer_error false))
+    |}]
+;;
