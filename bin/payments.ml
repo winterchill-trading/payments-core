@@ -125,6 +125,16 @@ let demo =
        in
        let deposit =
          Transfer.incoming
+           ~details:
+             (Sepa
+                (Sepa.Details.create
+                   ~payment_id:
+                     (Iso20022.Payment_id.create ~end_to_end_id:"DEMO-IN-1" () |> Or_error.ok_exn)
+                   ~debtor:
+                     { name = "Payer"; iban = Iban.of_string_exn "DE89370400440532013000"; bic = None; address = None }
+                   ~creditor:
+                     { name = "Demo Customer"; iban = Iban.of_string_exn "GB82WEST12345698765432"; bic = None; address = None }
+                   ()))
            ~id:(Transfer.Id.of_string "deposit")
            ~rail:Sepa_credit
            ~account:customer
@@ -148,8 +158,21 @@ let demo =
            "DE89370400440532013000"
          |> Or_error.ok_exn
        in
+       let party name iban : Iso20022.Party.t =
+         { name; iban = Iban.of_string_exn iban; bic = None; address = None }
+       in
+       let details =
+         Transfer.Details.Sepa
+           (Sepa.Details.create
+              ~payment_id:
+                (Iso20022.Payment_id.create ~end_to_end_id:"DEMO-E2E-1" () |> Or_error.ok_exn)
+              ~debtor:(party "Demo Customer" "GB82WEST12345698765432")
+              ~creditor:(party "Demo Payee" "DE89370400440532013000")
+              ())
+       in
        let t =
          Transfer.draft
+           ~details
            ~id:(Transfer.Id.of_string "demo-transfer")
            ~rail:Sepa_credit
            ~account:customer
@@ -163,7 +186,7 @@ let demo =
        let s = step (b, t) Submitted "evt-1" in
        let b, _ =
          if fail
-         then step s (Failed Beneficiary_rejected) "evt-2"
+         then step s (Rejected AC01) "evt-2"
          else step (step s Pending "evt-2") Settled "evt-3"
        in
        printf

@@ -25,7 +25,7 @@ A sample transfer that fails after submission releases its hold:
   evt-1/hold
     Debit  customer:demo/eur                25.50 EUR
     Credit customer:demo/eur/pending        25.50 EUR
-  -> Failed
+  -> Rejected
   evt-2/release
     Debit  customer:demo/eur/pending        25.50 EUR
     Credit customer:demo/eur                25.50 EUR
