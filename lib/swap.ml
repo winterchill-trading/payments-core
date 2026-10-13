@@ -123,13 +123,14 @@ let execute (chart : Booking.Chart.t) balances (q : Quote.t) ~from_ ~to_ ~event_
   let sell_currency = Amount.currency q.sell in
   let buy_currency = Amount.currency q.buy in
   let net = Amount.sub_exn q.sell q.fee in
-  let entry tag postings =
+  let entry ?(code = Ledger.Entry.Code.Fx_leg) tag postings =
     let%bind idempotency_key =
       Ledger.Idempotency_key.of_string_or_error (event_id ^ "/" ^ tag)
     in
     Ledger.Entry.create
       ~idempotency_key
       ~kind:(Transfer tag)
+      ~code
       ~reference:(Id.to_string q.id)
       ~effective_at:now
       ~recorded_at:now
@@ -147,6 +148,7 @@ let execute (chart : Booking.Chart.t) balances (q : Quote.t) ~from_ ~to_ ~event_
     then Ok []
     else
       entry
+        ~code:Fee
         "swap-fee"
         [ Ledger.Posting.debit from_ q.fee
         ; Ledger.Posting.credit (chart.fee_income sell_currency) q.fee
