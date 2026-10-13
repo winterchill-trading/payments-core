@@ -1,6 +1,6 @@
 (library
  (name payments_core)
  (public_name payments-core)
- (libraries core async_kernel cryptokit)
+ (libraries core async_kernel cryptokit money ledger)
  (preprocess
   (pps ppx_jane)))
