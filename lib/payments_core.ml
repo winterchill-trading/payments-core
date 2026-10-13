@@ -16,3 +16,4 @@ module Transfer = Transfer
 module Booking = Booking
 module Schedule = Schedule
 module Standing_order = Standing_order
+module Swap = Swap
