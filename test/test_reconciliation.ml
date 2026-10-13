@@ -22,7 +22,9 @@ let ledger_with_pending_payment () =
   let book b entries = Booking.apply b (Or_error.ok_exn entries) |> Or_error.ok_exn in
   let b = book b (Booking.created chart b deposit ~event_id:"e0" ~at:t0) in
   let t = draft () in
-  let b = book b (Booking.transition chart b t ~to_:Submitted ~event_id:"e1" ~at:(at 1)) in
+  let b =
+    book b (Booking.transition chart b t ~to_:Submitted ~event_id:"e1" ~at:(at 1))
+  in
   b
 ;;
 
@@ -41,7 +43,8 @@ let%expect_test "balances" =
          b
          reported
        : Reconciliation.Diff.t list)];
-  [%expect {|
+  [%expect
+    {|
     ((Balance_mismatch (account customer:1/eur) (basis Available)
       (ledger "74.50 EUR") (provider "75.00 EUR") (delta "0.50 EUR"))
      (Unknown_account (account customer:9/eur))
@@ -52,17 +55,14 @@ let%expect_test "balances" =
 
 let%expect_test "transfers" =
   let submitted ref_ id =
-    { (Transfer.submit
-         (draft ())
-         ~provider_ref:ref_
-         ~at:(at 1)
-         ()
-       |> Or_error.ok_exn)
-      with
+    { (Transfer.submit (draft ()) ~provider_ref:ref_ ~at:(at 1) () |> Or_error.ok_exn) with
       id = Transfer.Id.of_string id
     }
   in
-  let settled = Transfer.transition (submitted "p-2" "tr-2") ~to_:Settled ~at:(at 2) |> Or_error.ok_exn in
+  let settled =
+    Transfer.transition (submitted "p-2" "tr-2") ~to_:Settled ~at:(at 2)
+    |> Or_error.ok_exn
+  in
   let ours = [ submitted "p-1" "tr-1"; settled; submitted "p-3" "tr-3"; draft () ] in
   let theirs : Reconciliation.Reported_transfer.t list =
     [ { provider_ref = "p-1"; status = Settled }
@@ -71,7 +71,8 @@ let%expect_test "transfers" =
     ]
   in
   print_s [%sexp (Reconciliation.transfers ours theirs : Reconciliation.Diff.t list)];
-  [%expect {|
+  [%expect
+    {|
     ((Status_mismatch (transfer tr-1) (provider_ref p-1) (ledger Submitted)
       (provider Settled))
      (Unknown_transfer (provider_ref p-9) (provider Pending))
@@ -97,7 +98,9 @@ let%expect_test "breaks, carry-forward, ageing and maker-checker resolution" =
     ; { provider_ref = "p-9"; amount = eur "9.00"; value_date = d "2026-10-05" }
     ]
   in
-  let day1 = Reconciliation.match_transactions ~business_date:(d "2026-10-13") ours theirs in
+  let day1 =
+    Reconciliation.match_transactions ~business_date:(d "2026-10-13") ours theirs
+  in
   List.iter day1 ~f:(fun b -> print_s [%sexp (b.id : string), (b.first_seen : Date.t)]);
   (* next day: p-3 still missing at the provider, now past the timing window *)
   let day2 =
@@ -108,8 +111,11 @@ let%expect_test "breaks, carry-forward, ageing and maker-checker resolution" =
   List.iter day2 ~f:(fun b -> print_s [%sexp (b.id : string), (b.first_seen : Date.t)]);
   print_s
     [%sexp
-      (Reconciliation.ageing day2 ~today:(d "2026-10-23") : (Reconciliation.Break.Age.t * int) list)];
-  let mismatch = List.find_exn day2 ~f:(fun b -> String.equal b.id "Amount_mismatch:p-2") in
+      (Reconciliation.ageing day2 ~today:(d "2026-10-23")
+       : (Reconciliation.Break.Age.t * int) list)];
+  let mismatch =
+    List.find_exn day2 ~f:(fun b -> String.equal b.id "Amount_mismatch:p-2")
+  in
   let adjustment =
     Ledger.Entry.create
       ~idempotency_key:(Ledger.Idempotency_key.of_string "adj-1")
@@ -122,10 +128,16 @@ let%expect_test "breaks, carry-forward, ageing and maker-checker resolution" =
       ]
     |> Or_error.ok_exn
   in
-  let show r = print_s [%sexp (Result.map r ~f:(fun (b : Reconciliation.Break.t) -> b.status) : Reconciliation.Break.Status.t Or_error.t)] in
+  let show r =
+    print_s
+      [%sexp
+        (Result.map r ~f:(fun (b : Reconciliation.Break.t) -> b.status)
+         : Reconciliation.Break.Status.t Or_error.t)]
+  in
   show (Reconciliation.Break.resolve mismatch ~adjustment ~maker:"op-1" ~checker:"op-1");
   show (Reconciliation.Break.resolve mismatch ~adjustment ~maker:"op-1" ~checker:"op-2");
-  [%expect {|
+  [%expect
+    {|
     (Amount_mismatch:p-2 2026-10-13)
     (Timing:p-3 2026-10-13)
     (Missing_external:p-4 2026-10-13)

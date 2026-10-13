@@ -3,8 +3,10 @@ open Payments_core
 
 let check network raw =
   match Crypto_address.create network raw with
-  | Ok a -> printf "ok   %-16s %s\n" (Network.to_string network) (Crypto_address.address a)
-  | Error e -> printf "FAIL %-16s %s\n" (Network.to_string network) (Error.to_string_hum e)
+  | Ok a ->
+    printf "ok   %-16s %s\n" (Network.to_string network) (Crypto_address.address a)
+  | Error e ->
+    printf "FAIL %-16s %s\n" (Network.to_string network) (Error.to_string_hum e)
 ;;
 
 let%expect_test "bitcoin" =
@@ -18,7 +20,8 @@ let%expect_test "bitcoin" =
     ; Bitcoin_testnet, "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
     ]
     ~f:(fun (n, a) -> check n a);
-  [%expect {|
+  [%expect
+    {|
     ok   bitcoin          1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa
     ok   bitcoin          3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy
     ok   bitcoin          bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4
@@ -46,7 +49,8 @@ let%expect_test "evm, tron, solana" =
     ; Solana, "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"
     ]
     ~f:(fun (n, a) -> check n a);
-  [%expect {|
+  [%expect
+    {|
     ok   ethereum         0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed
     ok   ethereum         0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359
     ok   polygon          0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb
@@ -72,13 +76,19 @@ let%expect_test "EIP-55 vectors from the EIP" =
     ; "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb"
     ]
     ~f:(fun a ->
-      [%test_result: string option] (Crypto_address.eip55 (String.lowercase a)) ~expect:(Some a));
+      [%test_result: string option]
+        (Crypto_address.eip55 (String.lowercase a))
+        ~expect:(Some a));
   [%expect {| |}]
 ;;
 
 let%expect_test "spellings of one address are equal" =
-  let a = Crypto_address.create_exn Ethereum "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed" in
-  let b = Crypto_address.create_exn Ethereum "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed" in
+  let a =
+    Crypto_address.create_exn Ethereum "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+  in
+  let b =
+    Crypto_address.create_exn Ethereum "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed"
+  in
   print_s [%message (Crypto_address.equal a b : bool)];
   [%expect {| ("Crypto_address.equal a b" true) |}]
 ;;

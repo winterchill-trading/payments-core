@@ -20,8 +20,8 @@ let show s =
   | Error e -> print_s [%message "error" ~_:(e : Error.t)]
 ;;
 
-(* Synthetic invoices built with the BIP 173 reference encoder; the 65-byte signature
-   is zeros, which this library does not check (see the module docs). *)
+(* Synthetic invoices built with the BIP 173 reference encoder; the 65-byte signature is
+   zeros, which this library does not check (see the module docs). *)
 let testnet_invoice =
   "lntb10u1p5ww7qqpp5qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0sdq2vdhkven9v5xqzjcqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqfujy6r"
 ;;
@@ -37,7 +37,8 @@ let%expect_test "invoices" =
   show
     "lnbc2500u1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpuaztrnwngzn3kdzw5hydlzf03qdgm2hdq27cqv3agm2awhz5se903vruatfhq77w3ls4evs3ch9zw97j25emudupq63nyw24cg27h2rspfj9srp";
   show (String.drop_suffix testnet_invoice 1 ^ "q");
-  [%expect {|
+  [%expect
+    {|
     (invoice (network Bitcoin_testnet) (amount_msat (1000000))
      (timestamp "2025-10-09 08:53:20Z") (expiry 10m)
      (payment_hash
@@ -64,7 +65,8 @@ let%expect_test "expiry" =
     [%message
       (Lightning.Invoice.is_expired i ~now:(at 599) : bool)
         (Lightning.Invoice.is_expired i ~now:(at 600) : bool)];
-  [%expect {|
+  [%expect
+    {|
     (("Lightning.Invoice.is_expired i ~now:(at 599)" false)
      ("Lightning.Invoice.is_expired i ~now:(at 600)" true))
     |}]
@@ -79,7 +81,8 @@ let%expect_test "lnurl and addresses" =
     ; "bad user@example.com"
     ; "user@localhost"
     ];
-  [%expect {|
+  [%expect
+    {|
     ((t (Lnurl https://service.example/lnurl-pay?tag=x))
      (pay_url (https://service.example/lnurl-pay?tag=x)))
     ((t (Lnurl https://service.example/lnurl-pay?tag=x))

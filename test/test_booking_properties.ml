@@ -42,7 +42,8 @@ let gen =
   in
   let%bind amount_cents = Int.gen_incl 1 10_000 in
   let%bind fee_cents =
-    Quickcheck.Generator.weighted_union [ 1., return 0; 2., Int.gen_incl 1 (min 200 amount_cents) ]
+    Quickcheck.Generator.weighted_union
+      [ 1., return 0; 2., Int.gen_incl 1 (min 200 amount_cents) ]
   in
   let%bind funding_cents = Int.gen_incl 0 12_000 in
   let%bind start_settled = Bool.quickcheck_generator in
@@ -60,8 +61,13 @@ let travel_rule : Travel_rule.t =
       ; lei = None
       }
   ; beneficiary =
-      { name = "Ada Example"; account = "bc1q-example"; identification = None; lei = None }
-  ; counterparty_wallet = Hosted { provider_name = "Example Exchange"; provider_lei = None }
+      { name = "Ada Example"
+      ; account = "bc1q-example"
+      ; identification = None
+      ; lei = None
+      }
+  ; counterparty_wallet =
+      Hosted { provider_name = "Example Exchange"; provider_lei = None }
   }
 ;;
 
@@ -165,7 +171,8 @@ let run case =
   List.foldi case.choices ~init:(b, t) ~f:(fun i (b, t) choice ->
     (* Candidates the state machine accepts here, reason codes included. *)
     let next =
-      List.filter candidates ~f:(fun to_ -> Result.is_ok (Transfer.transition t ~to_ ~at:t0))
+      List.filter candidates ~f:(fun to_ ->
+        Result.is_ok (Transfer.transition t ~to_ ~at:t0))
     in
     if List.is_empty next
     then b, t

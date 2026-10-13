@@ -4,11 +4,7 @@ open Payments_core
 let show s =
   match Iban.of_string s with
   | Ok iban ->
-    printf
-      "%s -> %s sepa=%b\n"
-      s
-      (Iban.to_string_grouped iban)
-      (Iban.is_sepa iban)
+    printf "%s -> %s sepa=%b\n" s (Iban.to_string_grouped iban) (Iban.is_sepa iban)
   | Error e -> printf "%s -> %s\n" s (Error.to_string_hum e)
 ;;
 
@@ -24,7 +20,8 @@ let%expect_test "valid and invalid IBANs" =
     ; "ZZ12 3456"
     ; "DE89-3704"
     ];
-  [%expect {|
+  [%expect
+    {|
     DE89 3704 0044 0532 0130 00 -> DE89 3704 0044 0532 0130 00 sepa=true
     gb82west12345698765432 -> GB82 WEST 1234 5698 7654 32 sepa=true
     NO9386011117947 -> NO93 8601 1117 947 sepa=true

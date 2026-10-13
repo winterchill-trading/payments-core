@@ -5,7 +5,10 @@ open Payments_core
 let t0 = Time_ns.of_string_with_utc_offset "2026-10-13 09:00:00Z"
 let at sec = Time_ns.add t0 (Time_ns.Span.of_int_sec sec)
 let eur s = Money.Amount.of_decimal_string Money.Currency.eur s |> Or_error.ok_exn
-let binding = Sca.Binding.create ~operation:"transfer" ~amount:(eur "25.00") ~payee:"ben-1"
+
+let binding =
+  Sca.Binding.create ~operation:"transfer" ~amount:(eur "25.00") ~payee:"ben-1"
+;;
 
 let challenge ?(factors = Sca.Kind.[ Otp; Pin ]) ?max_attempts () =
   Sca.Challenge.create
@@ -45,8 +48,10 @@ let%expect_test "two categories are required" =
       (challenge ~factors:[ Otp; Totp; Passkey ] () |> Result.map ~f:(fun _ -> ())
        : unit Or_error.t)];
   Core.print_s
-    [%sexp (challenge ~max_attempts:6 () |> Result.map ~f:(fun _ -> ()) : unit Or_error.t)];
-  [%expect {|
+    [%sexp
+      (challenge ~max_attempts:6 () |> Result.map ~f:(fun _ -> ()) : unit Or_error.t)];
+  [%expect
+    {|
     (Error
      ("SCA needs factors from two element categories"
       (factors (Otp Totp Passkey))))
@@ -61,7 +66,8 @@ let%expect_test "possession then knowledge verifies; a used challenge authorises
   let%bind c = run c ~kind:Pin ~response:"0000" ~now:(at 10) in
   let%bind c = run c ~kind:Pin ~response:"4242" ~now:(at 15) in
   let%bind _ = run c ~kind:Pin ~response:"4242" ~now:(at 20) in
-  [%expect {|
+  [%expect
+    {|
     ((outcome (Factor_accepted (remaining (Pin)))) (status Pending)
      (elements (Possession)))
     ((outcome (Wrong_response (attempts_left 2))) (status Pending)
@@ -76,11 +82,14 @@ let%expect_test "possession then knowledge verifies; a used challenge authorises
 
 let%expect_test "locks after the configured wrong answers, no factor named" =
   let%bind c =
-    Deferred.List.fold [ 1; 2; 3 ] ~init:(challenge () |> Or_error.ok_exn) ~f:(fun c i ->
-      run c ~kind:Pin ~response:"9999" ~now:(at i))
+    Deferred.List.fold
+      [ 1; 2; 3 ]
+      ~init:(challenge () |> Or_error.ok_exn)
+      ~f:(fun c i -> run c ~kind:Pin ~response:"9999" ~now:(at i))
   in
   let%bind _ = run c ~kind:Otp ~response:"123456" ~now:(at 5) in
-  [%expect {|
+  [%expect
+    {|
     ((outcome (Wrong_response (attempts_left 2))) (status Pending) (elements ()))
     ((outcome (Wrong_response (attempts_left 1))) (status Pending) (elements ()))
     ((outcome (Rejected Too_many_attempts)) (status (Failed Too_many_attempts))
@@ -93,15 +102,21 @@ let%expect_test "locks after the configured wrong answers, no factor named" =
 
 let%expect_test "binding, factor kind and expiry" =
   let c = challenge () |> Or_error.ok_exn in
-  let other = Sca.Binding.create ~operation:"transfer" ~amount:(eur "2500.00") ~payee:"ben-1" in
+  let other =
+    Sca.Binding.create ~operation:"transfer" ~amount:(eur "2500.00") ~payee:"ben-1"
+  in
   let other_currency =
-    Sca.Binding.create ~operation:"transfer" ~amount:(Money.Amount.of_string "25.00 USD") ~payee:"ben-1"
+    Sca.Binding.create
+      ~operation:"transfer"
+      ~amount:(Money.Amount.of_string "25.00 USD")
+      ~payee:"ben-1"
   in
   let%bind _ = run c ~binding:other ~kind:Otp ~response:"123456" ~now:(at 10) in
   let%bind _ = run c ~binding:other_currency ~kind:Otp ~response:"123456" ~now:(at 10) in
   let%bind _ = run c ~kind:Biometric ~response:"x" ~now:(at 10) in
   let%bind _ = run c ~kind:Otp ~response:"123456" ~now:(at 300) in
-  [%expect {|
+  [%expect
+    {|
     ((outcome Binding_mismatch) (status Pending) (elements ()))
     ((outcome Binding_mismatch) (status Pending) (elements ()))
     ((outcome (Not_a_factor Biometric)) (status Pending) (elements ()))
@@ -123,8 +138,10 @@ let%expect_test "per-customer lock: temporary, then permanent within a day" =
         (Sca.Lock.is_locked lock ~now:(at 60) : bool)
         (Sca.Lock.is_locked lock ~now:(at 1900) : bool)];
   let lock, notice = fail_5 lock ~from:2000 in
-  Core.print_s [%message (lock.status : Sca.Lock.status) (notice : Sca.Lock.Notice.t option)];
-  [%expect {|
+  Core.print_s
+    [%message (lock.status : Sca.Lock.status) (notice : Sca.Lock.Notice.t option)];
+  [%expect
+    {|
     ((lock.status (Temporary (until "2026-10-13 09:30:04Z")))
      (notice (Locked_temporarily_next_is_permanent))
      ("Sca.Lock.is_locked lock ~now:(at 60)" true)
@@ -157,7 +174,8 @@ let%expect_test "idle session and exemption counters" =
              [ Trusted_beneficiary; Low_value_remote; Tra { band = Eur_250; score = 12 } ]
            ~f:Sca.Exemption.article
          : string list)];
-  [%expect {|
+  [%expect
+    {|
     (("Sca.Session.is_active s ~now:(at 300)" true)
      ("Sca.Session.is_active s ~now:(at 301)" false)
      ("(Sca.Session.touch s ~now:(at 400)) |> Result.is_ok" false))
@@ -194,7 +212,8 @@ let%expect_test "audit event never carries the code" =
          ~at:(at 1)
          ()
        : Sca.Event.t)];
-  [%expect {|
+  [%expect
+    {|
     ((challenge ch-1) (subject c-1) (operation transfer) (amount ("25.00 EUR"))
      (payee (ben-1))
      (binding c3fa9095133f6a2f8dfd6d27b20b59931343a30d11e918ba00baee5e3616b9c1)
@@ -211,12 +230,15 @@ let%expect_test "TOTP matches the RFC 6238 SHA-1 vectors" =
     let time = Time_ns.of_span_since_epoch (Time_ns.Span.of_int_sec s) in
     Core.printf "%d %s\n" s (Sca.Totp.code ~secret ~time ~digits:8));
   let time = Time_ns.of_span_since_epoch (Time_ns.Span.of_int_sec 59) in
-  let prev = Sca.Totp.code ~secret ~time:(Time_ns.sub time (Time_ns.Span.of_int_sec 30)) ~digits:6 in
+  let prev =
+    Sca.Totp.code ~secret ~time:(Time_ns.sub time (Time_ns.Span.of_int_sec 30)) ~digits:6
+  in
   Core.print_s
     [%message
       (Sca.Totp.check ~secret ~time prev : bool)
         (Sca.Totp.check ~secret ~time ~window:0 prev : bool)];
-  [%expect {|
+  [%expect
+    {|
     59 94287082
     1111111109 07081804
     1111111111 14050471

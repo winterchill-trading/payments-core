@@ -32,7 +32,8 @@ let%expect_test "destinations per rail" =
   show ~rail:Lightning "satoshi@example.com";
   show ~rail:Intraledger "acct-42";
   show ~rail:Card_scheme "anything";
-  [%expect {|
+  [%expect
+    {|
     ((b.destination
       (Bank_account (iban DE89370400440532013000) (bic (COBADEFFXXX))))
      (rails (Sepa_credit Sepa_instant)))
@@ -65,7 +66,8 @@ let%expect_test "trust and cooling off" =
         (Beneficiary.is_new b ~now:(later 24.) ~cooling_off : bool)
         (Beneficiary.usable_on b Sepa_instant : bool)
         (Beneficiary.usable_on b Lightning : bool)];
-  [%expect {|
+  [%expect
+    {|
     ((b.trusted false) ("(Beneficiary.trust b).trusted" true)
      ("Beneficiary.is_new b ~now:(later 1.) ~cooling_off" true)
      ("Beneficiary.is_new b ~now:(later 24.) ~cooling_off" false)

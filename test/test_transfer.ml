@@ -15,7 +15,8 @@ let step t to_ sec =
 let%expect_test "allowed transitions table" =
   List.iter Transfer.allowed_transitions ~f:(fun (from, tos) ->
     printf "%-13s -> %s\n" from (String.concat ~sep:", " tos));
-  [%expect {|
+  [%expect
+    {|
     Draft         -> Awaiting_sca, Submitted, Cancelled, Failed
     Awaiting_sca  -> Submitted, Cancelled, Failed
     Submitted     -> Pending, Settled, Rejected, Failed, Timed_out
@@ -36,7 +37,8 @@ let%expect_test "allowed transitions table" =
 let%expect_test "outgoing SEPA lifecycle with SCA and a return" =
   let t = draft () in
   let t =
-    Transfer.require_sca t ~challenge:(Sca.Id.of_string "ch-1") ~at:(at 1) |> Or_error.ok_exn
+    Transfer.require_sca t ~challenge:(Sca.Id.of_string "ch-1") ~at:(at 1)
+    |> Or_error.ok_exn
   in
   let t = Transfer.submit t ~provider_ref:"prov-77" ~at:(at 5) () |> Or_error.ok_exn in
   let t = step t Pending 6 in
@@ -50,7 +52,8 @@ let%expect_test "outgoing SEPA lifecycle with SCA and a return" =
         (Transfer.total_debit t : Money.Amount.t)
         (t.provider_ref : string option)
         ~history:(List.rev t.history : (Transfer.Status.t * Utc_time.t) list)];
-  [%expect {|
+  [%expect
+    {|
     (ok (status Pending))
     (refused
      ("transition not allowed" (transfer tr-1) (from Pending) (to_ Pending)
@@ -86,7 +89,8 @@ let%expect_test "final rails: on-chain cannot return, settled is terminal" =
   let t = step t Settled 2 in
   let t = step t (Returned MS02) 3 in
   print_s [%message (Transfer.is_terminal t : bool)];
-  [%expect {|
+  [%expect
+    {|
     (ok (status Submitted))
     (ok (status Settled))
     (refused
@@ -118,7 +122,8 @@ let%expect_test "draft validation" =
   try_ (eur "1.00") (Money.Amount.of_string "0.00000001 BTC");
   try_ ~rail:Lightning (eur "1.00") (eur "0");
   try_ (eur "1.00") (eur "0");
-  [%expect {|
+  [%expect
+    {|
     (rejected ("amount must be positive" (amount "0.00 EUR")))
     (rejected ("fee must not be negative" (fee "-0.01 EUR")))
     (rejected

@@ -17,7 +17,8 @@ let%expect_test "next run dates" =
   show (Monthly { day = 31 }) "2026-10-13";
   show (Monthly { day = 29 }) "2027-01-30";
   show (Monthly { day = 13 }) "2026-10-13";
-  [%expect {|
+  [%expect
+    {|
     ((t Daily) 2026-12-30
      (runs (2026-12-30 2026-12-31 2027-01-01 2027-01-02 2027-01-03)))
     ((t (Weekly FRI)) 2026-10-13
@@ -38,8 +39,10 @@ let%expect_test "next_after is strictly after and on schedule" =
     Quickcheck.Generator.both
       (Quickcheck.Generator.union
          [ Quickcheck.Generator.return Schedule.Daily
-         ; Quickcheck.Generator.map Day_of_week.quickcheck_generator ~f:(fun d -> Schedule.Weekly d)
-         ; Quickcheck.Generator.map (Int.gen_incl 1 31) ~f:(fun day -> Schedule.Monthly { day })
+         ; Quickcheck.Generator.map Day_of_week.quickcheck_generator ~f:(fun d ->
+             Schedule.Weekly d)
+         ; Quickcheck.Generator.map (Int.gen_incl 1 31) ~f:(fun day ->
+             Schedule.Monthly { day })
          ])
       (Date.gen_incl (d "2000-01-01") (d "2100-12-31"))
   in
@@ -47,6 +50,8 @@ let%expect_test "next_after is strictly after and on schedule" =
     let next = Schedule.next_after t date in
     assert (Date.( > ) next date);
     (* nothing on schedule in between *)
-    [%test_result: Date.t] (Schedule.next_on_or_after t (Date.add_days date 1)) ~expect:next;
+    [%test_result: Date.t]
+      (Schedule.next_on_or_after t (Date.add_days date 1))
+      ~expect:next;
     assert (Date.diff next date <= 31))
 ;;

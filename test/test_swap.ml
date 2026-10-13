@@ -6,7 +6,10 @@ let btc_account = account "customer:1/btc"
 
 let funded_ledger eur_amount =
   let b =
-    ledger ~currencies:[ Money.Currency.eur; Money.Currency.btc ] ~customers:[ customer; btc_account ] ()
+    ledger
+      ~currencies:[ Money.Currency.eur; Money.Currency.btc ]
+      ~customers:[ customer; btc_account ]
+      ()
   in
   let deposit =
     Transfer.incoming
@@ -62,7 +65,14 @@ let%expect_test "EUR to BTC with spread and fee" =
         ~effective_price:(Money.Rate.price_to_string (Swap.Quote.effective_price q))];
   let b = funded_ledger "150.00" in
   let entries =
-    Swap.execute chart b q ~from_:customer ~to_:btc_account ~event_id:"swap-evt-1" ~now:(at 10)
+    Swap.execute
+      chart
+      b
+      q
+      ~from_:customer
+      ~to_:btc_account
+      ~event_id:"swap-evt-1"
+      ~now:(at 10)
     |> Or_error.ok_exn
   in
   print_entries entries;
@@ -73,7 +83,8 @@ let%expect_test "EUR to BTC with spread and fee" =
         ~eur:(Ledger.Balances.available b customer Money.Currency.eur : Money.Amount.t)
         ~btc:(Ledger.Balances.available b btc_account Money.Currency.btc : Money.Amount.t)];
   Ledger.Trial_balance.(check (of_balances b)) |> Or_error.ok_exn;
-  [%expect {|
+  [%expect
+    {|
     (quote (sell "100.00 EUR") (fee "0.50 EUR") (buy "0.00164175 BTC")
      (effective_price 0.0000164175))
     swap-evt-1/swap-sell  (Transfer swap-sell)  ref=q-1
@@ -92,8 +103,24 @@ let%expect_test "EUR to BTC with spread and fee" =
 let%expect_test "refusals" =
   let q = quote () |> Or_error.ok_exn in
   let show r = print_s [%sexp (r |> Result.map ~f:(fun _ -> ()) : unit Or_error.t)] in
-  show (Swap.execute chart (funded_ledger "150.00") q ~from_:customer ~to_:btc_account ~event_id:"e" ~now:(at 30));
-  show (Swap.execute chart (funded_ledger "50.00") q ~from_:customer ~to_:btc_account ~event_id:"e" ~now:(at 1));
+  show
+    (Swap.execute
+       chart
+       (funded_ledger "150.00")
+       q
+       ~from_:customer
+       ~to_:btc_account
+       ~event_id:"e"
+       ~now:(at 30));
+  show
+    (Swap.execute
+       chart
+       (funded_ledger "50.00")
+       q
+       ~from_:customer
+       ~to_:btc_account
+       ~event_id:"e"
+       ~now:(at 1));
   show (quote ~sell:"0.01" ());
   show
     (Swap.Quote.create
@@ -103,7 +130,8 @@ let%expect_test "refusals" =
        ~buy:Money.Currency.eth
        ~now:t0
        ());
-  [%expect {|
+  [%expect
+    {|
     (Error ("quote expired" (id q-1) (expires_at "2026-10-13 09:00:30Z")))
     (Error
      ("entry would take an account below zero" (id customer:1/eur)
@@ -137,7 +165,9 @@ let%expect_test "the customer never gets more than the quoted price allows" =
       | Error _ -> ()
       | Ok q ->
         let net = Money.Amount.(to_q (sub_exn q.sell q.fee)) in
-        let exact = Q.(net / of_int 60_000 * (one - (of_int spread_bps / of_int 10_000))) in
+        let exact =
+          Q.(net / of_int 60_000 * (one - (of_int spread_bps / of_int 10_000)))
+        in
         let got = Money.Amount.to_q q.buy in
         let one_sat = Q.of_ints 1 100_000_000 in
         assert (Q.leq got exact);

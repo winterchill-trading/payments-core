@@ -20,7 +20,10 @@ let funded amount =
       ()
     |> Or_error.ok_exn
   in
-  let entries = Booking.created chart (ledger ()) deposit ~event_id:"evt-in-1" ~at:t0 |> Or_error.ok_exn in
+  let entries =
+    Booking.created chart (ledger ()) deposit ~event_id:"evt-in-1" ~at:t0
+    |> Or_error.ok_exn
+  in
   print_entries entries;
   Booking.apply (ledger ()) entries |> Or_error.ok_exn
 ;;
@@ -53,7 +56,8 @@ let%expect_test "outgoing SEPA: hold, settle with a fee, then returned" =
   |> step ~event_id:"evt-3" ~sec:3 Settled
   |> step ~event_id:"evt-4" ~sec:4 (Returned AC04)
   |> finish;
-  [%expect {|
+  [%expect
+    {|
     evt-in-1/deposit  (Transfer deposit)  ref=in-1
       debit  settlement:sepa_credit/EUR               100.00 EUR
       credit customer:1/eur                           100.00 EUR
@@ -85,7 +89,8 @@ let%expect_test "outgoing SEPA: failed after submission releases the hold" =
   |> step ~event_id:"evt-1" ~sec:1 Submitted
   |> step ~event_id:"evt-2" ~sec:2 (Rejected AC01)
   |> finish;
-  [%expect {|
+  [%expect
+    {|
     evt-in-1/deposit  (Transfer deposit)  ref=in-1
       debit  settlement:sepa_credit/EUR               100.00 EUR
       credit customer:1/eur                           100.00 EUR
@@ -109,7 +114,8 @@ let%expect_test "outgoing over the available balance is refused at submission" =
   |> step ~event_id:"evt-1" ~sec:1 Submitted
   |> step ~event_id:"evt-2" ~sec:2 (Failed Insufficient_funds)
   |> finish;
-  [%expect {|
+  [%expect
+    {|
     evt-in-1/deposit  (Transfer deposit)  ref=in-1
       debit  settlement:sepa_credit/EUR               20.00 EUR
       credit customer:1/eur                           20.00 EUR
@@ -138,12 +144,14 @@ let%expect_test "incoming pending then settled with a fee, then returned" =
       ()
     |> Or_error.ok_exn
   in
-  print_entries (Booking.created chart (ledger ()) t ~event_id:"evt-0" ~at:t0 |> Or_error.ok_exn);
+  print_entries
+    (Booking.created chart (ledger ()) t ~event_id:"evt-0" ~at:t0 |> Or_error.ok_exn);
   (ledger (), t)
   |> step ~event_id:"evt-1" ~sec:1 Settled
   |> step ~event_id:"evt-2" ~sec:2 (Returned AC04)
   |> finish;
-  [%expect {|
+  [%expect
+    {|
     -- Settled
     evt-1/deposit  (Transfer deposit)  ref=in-2
       debit  settlement:sepa_credit/EUR               40.00 EUR

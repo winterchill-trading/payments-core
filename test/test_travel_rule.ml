@@ -6,7 +6,9 @@ let person ?identification name account : Travel_rule.Person.t =
   { name; account; identification; lei = None }
 ;;
 
-let rule ?(identification = Some (Travel_rule.Identification.Customer_number "c-1")) wallet
+let rule
+  ?(identification = Some (Travel_rule.Identification.Customer_number "c-1"))
+  wallet
   : Travel_rule.t
   =
   { originator = person ?identification "Ada Example" "customer:1"
@@ -18,13 +20,26 @@ let rule ?(identification = Some (Travel_rule.Identification.Customer_number "c-
 let show r ~eur_value = print_s [%sexp (Travel_rule.check r ~eur_value : unit Or_error.t)]
 
 let%expect_test "travel rule checks" =
-  show (rule (Hosted { provider_name = "Example Exchange"; provider_lei = None })) ~eur_value:None;
-  show (rule ~identification:None (Hosted { provider_name = "Example Exchange"; provider_lei = None })) ~eur_value:None;
-  show (rule (Self_hosted { ownership_verified = false })) ~eur_value:(Some (eur "1000.00"));
-  show (rule (Self_hosted { ownership_verified = false })) ~eur_value:(Some (eur "1000.01"));
+  show
+    (rule (Hosted { provider_name = "Example Exchange"; provider_lei = None }))
+    ~eur_value:None;
+  show
+    (rule
+       ~identification:None
+       (Hosted { provider_name = "Example Exchange"; provider_lei = None }))
+    ~eur_value:None;
+  show
+    (rule (Self_hosted { ownership_verified = false }))
+    ~eur_value:(Some (eur "1000.00"));
+  show
+    (rule (Self_hosted { ownership_verified = false }))
+    ~eur_value:(Some (eur "1000.01"));
   show (rule (Self_hosted { ownership_verified = false })) ~eur_value:None;
-  show (rule (Self_hosted { ownership_verified = true })) ~eur_value:(Some (eur "5000.00"));
-  [%expect {|
+  show
+    (rule (Self_hosted { ownership_verified = true }))
+    ~eur_value:(Some (eur "5000.00"));
+  [%expect
+    {|
     (Ok ())
     (Error
      "originator needs an address, official document, customer number or date and place of birth")
@@ -42,7 +57,8 @@ let%expect_test "travel rule checks" =
 let%expect_test "LEI check digits" =
   List.iter [ "5493001KJTIIGC8Y1R12"; "5493001KJTIIGC8Y1R13"; "TOO-SHORT" ] ~f:(fun s ->
     print_s [%sexp (Travel_rule.Lei.of_string s : Travel_rule.Lei.t Or_error.t)]);
-  [%expect {|
+  [%expect
+    {|
     (Ok 5493001KJTIIGC8Y1R12)
     (Error ("invalid LEI" 5493001KJTIIGC8Y1R13))
     (Error ("invalid LEI" TOO-SHORT))

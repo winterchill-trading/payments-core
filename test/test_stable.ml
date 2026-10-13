@@ -16,7 +16,8 @@ let%expect_test "stable bin_prot digests" =
     ; "Standing_order", [%bin_digest: Standing_order.Stable.V1.t]
     ]
     ~f:(fun (name, digest) -> printf "%-18s %s\n" name digest);
-  [%expect {|
+  [%expect
+    {|
     Network            180a350eb7c08de68cbf9d0f401227c7
     Rail               8dfb73bd6a838ed1c3162c265c00348e
     Iban               d9a8da25d5656b016fb4dbdc2e4197fb
@@ -39,7 +40,8 @@ let%expect_test "a transfer round trips through bin_prot and sexp" =
   [%test_result: Transfer.t] back ~expect:t;
   [%test_result: Transfer.t] (Transfer.t_of_sexp (Transfer.sexp_of_t t)) ~expect:t;
   print_s [%sexp (t : Transfer.t)];
-  [%expect {|
+  [%expect
+    {|
     ((id tr-1) (direction Out) (rail Sepa_credit) (account customer:1/eur)
      (counterparty
       (Beneficiary

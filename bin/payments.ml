@@ -61,9 +61,17 @@ let schedule =
   Command.basic
     ~summary:"List the next run dates of a standing order schedule"
     (let%map_open.Command daily = flag "daily" no_arg ~doc:" every day"
-     and weekly = flag "weekly" (optional (Arg_type.create Day_of_week.of_string)) ~doc:"DAY every week on DAY"
+     and weekly =
+       flag
+         "weekly"
+         (optional (Arg_type.create Day_of_week.of_string))
+         ~doc:"DAY every week on DAY"
      and monthly = flag "monthly" (optional int) ~doc:"N every month on day N (clamped)"
-     and from = flag "from" (required (Arg_type.create Date.of_string)) ~doc:"DATE first possible date"
+     and from =
+       flag
+         "from"
+         (required (Arg_type.create Date.of_string))
+         ~doc:"DATE first possible date"
      and count = flag "count" (optional_with_default 6 int) ~doc:"N dates to print" in
      fun () ->
        let t : Schedule.t =
@@ -87,22 +95,33 @@ let demo =
   Command.basic
     ~summary:"Print the postings of a sample outgoing SEPA transfer"
     (let%map_open.Command amount =
-       flag "amount" (optional_with_default "25.00" string) ~doc:"EUR amount (default 25.00)"
-     and fee = flag "fee" (optional_with_default "0.50" string) ~doc:"EUR fee (default 0.50)"
+       flag
+         "amount"
+         (optional_with_default "25.00" string)
+         ~doc:"EUR amount (default 25.00)"
+     and fee =
+       flag "fee" (optional_with_default "0.50" string) ~doc:"EUR fee (default 0.50)"
      and fail = flag "fail" no_arg ~doc:" fail after submission instead of settling" in
      fun () ->
        let now = Time_ns.epoch in
-       let eur s = Money.Amount.of_decimal_string Money.Currency.eur s |> Or_error.ok_exn in
+       let eur s =
+         Money.Amount.of_decimal_string Money.Currency.eur s |> Or_error.ok_exn
+       in
        let customer = Ledger.Account_id.of_string "customer:demo/eur" in
        let chart = Booking.Chart.default in
        let open_ b a =
-         Ledger.Balances.apply b { seq = Ledger.Balances.next_seq b; event = Account_opened a }
+         Ledger.Balances.apply
+           b
+           { seq = Ledger.Balances.next_seq b; event = Account_opened a }
          |> Or_error.ok_exn
        in
        let b =
          List.fold
            (Ledger.Account.create customer Liability
-            :: Booking.Chart.accounts chart ~rails:[ Sepa_credit ] ~currencies:[ Money.Currency.eur ])
+            :: Booking.Chart.accounts
+                 chart
+                 ~rails:[ Sepa_credit ]
+                 ~currencies:[ Money.Currency.eur ])
            ~init:Ledger.Balances.empty
            ~f:open_
        in
@@ -117,7 +136,9 @@ let demo =
                (Money.Amount.to_string p.amount)))
        in
        let step (b, t) to_ event_id =
-         let entries = Booking.transition chart b t ~to_ ~event_id ~at:now |> Or_error.ok_exn in
+         let entries =
+           Booking.transition chart b t ~to_ ~event_id ~at:now |> Or_error.ok_exn
+         in
          printf "-> %s\n" (Transfer.Status.name to_);
          print entries;
          ( Booking.apply b entries |> Or_error.ok_exn
@@ -129,11 +150,20 @@ let demo =
              (Sepa
                 (Sepa.Details.create
                    ~payment_id:
-                     (Iso20022.Payment_id.create ~end_to_end_id:"DEMO-IN-1" () |> Or_error.ok_exn)
+                     (Iso20022.Payment_id.create ~end_to_end_id:"DEMO-IN-1" ()
+                      |> Or_error.ok_exn)
                    ~debtor:
-                     { name = "Payer"; iban = Iban.of_string_exn "DE89370400440532013000"; bic = None; address = None }
+                     { name = "Payer"
+                     ; iban = Iban.of_string_exn "DE89370400440532013000"
+                     ; bic = None
+                     ; address = None
+                     }
                    ~creditor:
-                     { name = "Demo Customer"; iban = Iban.of_string_exn "GB82WEST12345698765432"; bic = None; address = None }
+                     { name = "Demo Customer"
+                     ; iban = Iban.of_string_exn "GB82WEST12345698765432"
+                     ; bic = None
+                     ; address = None
+                     }
                    ()))
            ~id:(Transfer.Id.of_string "deposit")
            ~rail:Sepa_credit
@@ -145,7 +175,10 @@ let demo =
            ()
          |> Or_error.ok_exn
        in
-       let entries = Booking.created chart b deposit ~event_id:"evt-deposit" ~at:now |> Or_error.ok_exn in
+       let entries =
+         Booking.created chart b deposit ~event_id:"evt-deposit" ~at:now
+         |> Or_error.ok_exn
+       in
        print entries;
        let b = Booking.apply b entries |> Or_error.ok_exn in
        let beneficiary =
@@ -165,7 +198,8 @@ let demo =
          Transfer.Details.Sepa
            (Sepa.Details.create
               ~payment_id:
-                (Iso20022.Payment_id.create ~end_to_end_id:"DEMO-E2E-1" () |> Or_error.ok_exn)
+                (Iso20022.Payment_id.create ~end_to_end_id:"DEMO-E2E-1" ()
+                 |> Or_error.ok_exn)
               ~debtor:(party "Demo Customer" "GB82WEST12345698765432")
               ~creditor:(party "Demo Payee" "DE89370400440532013000")
               ())
@@ -191,8 +225,10 @@ let demo =
        in
        printf
          "available %s\n"
-         (Money.Amount.to_string (Ledger.Balances.available b customer Money.Currency.eur));
-       print_string (Ledger.Trial_balance.to_string_hum (Ledger.Trial_balance.of_balances b)))
+         (Money.Amount.to_string
+            (Ledger.Balances.available b customer Money.Currency.eur));
+       print_string
+         (Ledger.Trial_balance.to_string_hum (Ledger.Trial_balance.of_balances b)))
 ;;
 
 let () =

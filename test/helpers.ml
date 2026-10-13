@@ -23,7 +23,10 @@ let debtor_iban =
   Iban.of_string_exn ("DE" ^ Iban.check_digits ~country:"DE" ~bban ^ bban)
 ;;
 
-let sepa_details ?(end_to_end_id = "E2E-0001") ?(creditor_iban = "DE89370400440532013000") ()
+let sepa_details
+  ?(end_to_end_id = "E2E-0001")
+  ?(creditor_iban = "DE89370400440532013000")
+  ()
   =
   let party name iban : Iso20022.Party.t = { name; iban; bic = None; address = None } in
   Transfer.Details.Sepa

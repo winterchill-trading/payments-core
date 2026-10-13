@@ -9,9 +9,13 @@ let%expect_test "BIC shapes" =
       | Ok b ->
         print_s
           [%message
-            s ~bic:(Bic.to_string b) ~country:(Bic.country b) ~branch:(Bic.branch b : string option)]
+            s
+              ~bic:(Bic.to_string b)
+              ~country:(Bic.country b)
+              ~branch:(Bic.branch b : string option)]
       | Error e -> print_s [%message s ~error:(e : Error.t)]);
-  [%expect {|
+  [%expect
+    {|
     (DEUTDEFF (bic DEUTDEFF) (country DE) (branch ()))
     (deutdeff500 (bic DEUTDEFF500) (country DE) (branch (500)))
     (NEDSZAJJXXX (bic NEDSZAJJXXX) (country ZA) (branch ()))

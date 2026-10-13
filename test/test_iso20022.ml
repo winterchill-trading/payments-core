@@ -6,10 +6,16 @@ let show f x = print_s [%sexp (Result.map (f x) ~f:(fun _ -> "ok") : string Or_e
 
 let%expect_test "creditor references (ISO 11649)" =
   List.iter
-    [ "RF18 5390 0754 7034"; "RF18000000000539007547034"; "RF19 5390 0754 7034"; "RF18 5390-0754" ]
+    [ "RF18 5390 0754 7034"
+    ; "RF18000000000539007547034"
+    ; "RF19 5390 0754 7034"
+    ; "RF18 5390-0754"
+    ]
     ~f:(show Creditor_reference.of_string);
-  print_s [%sexp (Creditor_reference.of_body "539007547034" : Creditor_reference.t Or_error.t)];
-  [%expect {|
+  print_s
+    [%sexp (Creditor_reference.of_body "539007547034" : Creditor_reference.t Or_error.t)];
+  [%expect
+    {|
     (Ok ok)
     (Ok ok)
     (Error ("invalid ISO 11649 creditor reference" "RF19 5390 0754 7034"))
@@ -30,16 +36,19 @@ let%expect_test "generated creditor references validate" =
 ;;
 
 let%expect_test "identifiers and text" =
-  List.iter [ "E2E-2026-10-13/0001"; "/leading"; "a//b"; "naïve"; String.make 36 'x' ]
+  List.iter
+    [ "E2E-2026-10-13/0001"; "/leading"; "a//b"; "naïve"; String.make 36 'x' ]
     ~f:(show (fun s -> Payment_id.create ~end_to_end_id:s ()));
   show Uetr.of_string "eb6305c9-1f7f-49de-aed0-16487c27b42d";
   show Uetr.of_string "eb6305c9-1f7f-39de-aed0-16487c27b42d";
   let state = Random.State.make [| 42 |] in
   Quickcheck.test Unit.quickcheck_generator ~sexp_of:Unit.sexp_of_t ~f:(fun () ->
-    ignore (Uetr.of_string (Uetr.to_string (Uetr.create state)) |> Or_error.ok_exn : Uetr.t));
+    ignore
+      (Uetr.of_string (Uetr.to_string (Uetr.create state)) |> Or_error.ok_exn : Uetr.t));
   show Remittance.unstructured "Invoice 2026-118, thank you";
   show Remittance.unstructured (String.make 141 'a');
-  [%expect {|
+  [%expect
+    {|
     (Ok ok)
     (Error
      ("identifier with a leading, trailing or double slash" end_to_end_id
@@ -68,7 +77,8 @@ let%expect_test "addresses" =
   show Postal_address.validate a;
   show Postal_address.validate { a with country = "Germany" };
   show Postal_address.validate { a with lines = [ "a"; "b"; "c" ] };
-  [%expect {|
+  [%expect
+    {|
     (Ok ok)
     (Error ("country must be ISO 3166 alpha-2" Germany))
     (Error "at most two address lines")
@@ -77,24 +87,31 @@ let%expect_test "addresses" =
 
 let%expect_test "generated end-to-end ids always pass the SEPA checks" =
   let state = Random.State.make [| 7 |] in
-  Quickcheck.test String.quickcheck_generator ~sexp_of:String.sexp_of_t ~f:(fun transfer_id ->
-    let id = Payment_id.generate ~transfer_id state in
-    ignore
-      (Payment_id.create ~end_to_end_id:id.end_to_end_id ?uetr:id.uetr () |> Or_error.ok_exn
-       : Payment_id.t));
+  Quickcheck.test
+    String.quickcheck_generator
+    ~sexp_of:String.sexp_of_t
+    ~f:(fun transfer_id ->
+      let id = Payment_id.generate ~transfer_id state in
+      ignore
+        (Payment_id.create ~end_to_end_id:id.end_to_end_id ?uetr:id.uetr ()
+         |> Or_error.ok_exn
+         : Payment_id.t));
   let id = Payment_id.generate ~transfer_id:"/tr//2026:ö 1/" state in
   print_endline id.end_to_end_id;
   [%expect {| -tr/-2026:---1- |}]
 ;;
 
 let%expect_test "reason code kinds" =
-  List.iter Iso_reason.[ AC04; FOCR; DUPL; CUST; AB05; AM02 ] ~f:(fun r ->
-    print_s
-      [%message
-        (Iso_reason.to_code r)
-          ~kinds:(Iso_reason.kinds r : Iso_reason.Kind.t list)
-          ~customer_error:(Iso_reason.is_customer_error r : bool)]);
-  [%expect {|
+  List.iter
+    Iso_reason.[ AC04; FOCR; DUPL; CUST; AB05; AM02 ]
+    ~f:(fun r ->
+      print_s
+        [%message
+          (Iso_reason.to_code r)
+            ~kinds:(Iso_reason.kinds r : Iso_reason.Kind.t list)
+            ~customer_error:(Iso_reason.is_customer_error r : bool)]);
+  [%expect
+    {|
     (AC04 (kinds (Reject Return Answer)) (customer_error true))
     (FOCR (kinds (Return)) (customer_error false))
     (DUPL (kinds (Recall)) (customer_error false))

@@ -1,6 +1,13 @@
 (library
  (name payments_core_test)
- (libraries payments-core core async async_kernel zarith base_quickcheck expect_test_helpers_core)
+ (libraries
+  payments-core
+  core
+  async
+  async_kernel
+  zarith
+  base_quickcheck
+  expect_test_helpers_core)
  (inline_tests
   (flags
    (:standard -source-tree-root .)))
