@@ -155,6 +155,14 @@ let incoming
   let open Or_error.Let_syntax in
   let fee = Option.value fee ~default:(Money.Amount.zero (Money.Amount.currency amount)) in
   let%bind () = check_amounts ~amount ~fee in
+  let%bind () =
+    (* The fee is booked out of the credited amount; a larger fee would overdraw. *)
+    match Money.Amount.compare_value fee amount with
+    | Ok c when c > 0 ->
+      Or_error.error_s
+        [%message "fee exceeds the incoming amount" (amount : Money.Amount.t) (fee : Money.Amount.t)]
+    | _ -> Ok ()
+  in
   let%map () =
     match status with
     | Pending | Settled -> Ok ()

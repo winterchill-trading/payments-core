@@ -117,7 +117,8 @@ val draft
   -> unit
   -> t Or_error.t
 
-(** An incoming payment as first reported: [Pending] or [Settled]. *)
+(** An incoming payment as first reported: [Pending] or [Settled]. Fails like {!draft}
+    on amounts, and when the fee exceeds the amount. *)
 val incoming
   :  id:Id.t
   -> rail:Rail.t

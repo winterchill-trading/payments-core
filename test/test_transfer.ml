@@ -121,3 +121,19 @@ let%expect_test "draft validation" =
     ok
     |}]
 ;;
+
+let%expect_test "incoming fee may not exceed the amount" =
+  (* Found by the booking property: the fee leg would overdraw the customer. *)
+  Transfer.incoming
+    ~id:(Transfer.Id.of_string "in-x")
+    ~rail:Sepa_credit
+    ~account:(account "customer:1/eur")
+    ~from:(External { name = "Payer"; detail = "test" })
+    ~amount:(eur "0.01")
+    ~fee:(eur "1.16")
+    ~status:Pending
+    ~now:t0
+    ()
+  |> Result.iter_error ~f:(fun e -> print_s [%sexp (e : Error.t)]);
+  [%expect {| ("fee exceeds the incoming amount" (amount "0.01 EUR") (fee "1.16 EUR")) |}]
+;;
