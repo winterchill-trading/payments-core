@@ -77,3 +77,99 @@ val balances
     [Missing_at_provider] is reported only for transfers in flight ([Submitted] or
     [Pending]), since providers usually list only a recent window. *)
 val transfers : Transfer.t list -> Reported_transfer.t list -> Diff.t list
+
+(** {2 Transaction matching and breaks}
+
+    The daily job: match our booked transactions with the provider's on the provider
+    id, record every difference as a {!Break}, carry breaks across runs keeping the day
+    they were first seen, and age them in business days. A break is resolved only by
+    an adjustment entry in the ledger, made by one operator and approved by another. *)
+
+module Internal_tx : sig
+  type t =
+    { provider_ref : string
+    ; amount : Money.Amount.t
+    ; booked_on : Date.t
+    }
+  [@@deriving sexp, compare, equal]
+end
+
+module External_tx : sig
+  type t =
+    { provider_ref : string
+    ; amount : Money.Amount.t
+    ; value_date : Date.t
+    }
+  [@@deriving sexp, compare, equal]
+end
+
+module Break : sig
+  module Kind : sig
+    type t =
+      | Timing (** one side is still expected to catch up *)
+      | Missing_internal (** the provider has it, we never booked it *)
+      | Missing_external (** we booked it, the provider has nothing *)
+      | Amount_mismatch
+      | Duplicate (** the same provider id booked twice *)
+    [@@deriving sexp, compare, equal, enumerate]
+  end
+
+  module Status : sig
+    type t =
+      | Open
+      | Explained of string
+      | Resolved of
+          { adjustment : Ledger.Idempotency_key.t
+          ; maker : string
+          ; checker : string
+          }
+    [@@deriving sexp, compare, equal]
+  end
+
+  type t =
+    { id : string (** [<kind>:<provider ref>], stable across runs *)
+    ; kind : Kind.t
+    ; provider_ref : string
+    ; internal : Money.Amount.t option
+    ; external_ : Money.Amount.t option
+    ; first_seen : Date.t
+    ; status : Status.t
+    }
+  [@@deriving sexp, compare, equal]
+
+  module Age : sig
+    type t =
+      | Days_0_1
+      | Days_2_5
+      | Over_5
+    [@@deriving sexp, compare, equal, enumerate]
+  end
+
+  (** Age in TARGET business days since [first_seen]. *)
+  val age : t -> today:Date.t -> Age.t
+
+  val explain : t -> string -> t
+
+  (** Resolves with a booked adjustment entry whose reference names the break id.
+      Fails when maker and checker are the same person or the entry does not
+      reference the break. *)
+  val resolve : t -> adjustment:Ledger.Entry.t -> maker:string -> checker:string -> t Or_error.t
+end
+
+(** Breaks for one business day. A side missing for at most [timing_days] business days
+    (default 1) is a [Timing] break rather than a missing one. *)
+val match_transactions
+  :  ?timing_days:int
+  -> business_date:Date.t
+  -> Internal_tx.t list
+  -> External_tx.t list
+  -> Break.t list
+
+(** Merges a new run into the open breaks: a break seen before keeps its [first_seen]
+    and status (a [Timing] break that became a missing one keeps its date); a [Timing]
+    break absent from the new run has cleared by itself and is dropped; other open
+    breaks stay until resolved, even when the run no longer reports them. *)
+val carry_forward : previous:Break.t list -> current:Break.t list -> Break.t list
+
+(** Open breaks per age bucket. *)
+val ageing : Break.t list -> today:Date.t -> (Break.Age.t * int) list
