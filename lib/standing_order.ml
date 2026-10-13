@@ -25,6 +25,7 @@ module Stable = struct
       ; rail : Rail.Stable.V1.t
       ; amount : Money.Amount.Stable.V1.t
       ; reference : string
+      ; details : Transfer.Details.t option
       ; schedule : Schedule.t
       ; until : Date.Stable.V1.t option
       ; next_run : Date.Stable.V1.t
@@ -44,7 +45,28 @@ let past_until t date =
   | None -> false
 ;;
 
-let create ~id ~account ~beneficiary ~rail ~amount ?(reference = "") ~schedule ~start ?until () =
+let details_for_run ~id ~run_date (details : Transfer.Details.t option) =
+  match details with
+  | Some (Sepa d) ->
+    let end_to_end_id = sprintf "%s-%s" (Id.to_string id) (Date.to_string run_date) in
+    Or_error.map (Iso20022.Payment_id.create ~end_to_end_id ()) ~f:(fun payment_id ->
+      Some (Transfer.Details.Sepa { d with payment_id }))
+  | other -> Ok other
+;;
+
+let create
+  ~id
+  ~account
+  ~beneficiary
+  ~rail
+  ~amount
+  ?(reference = "")
+  ?details
+  ~schedule
+  ~start
+  ?until
+  ()
+  =
   let open Or_error.Let_syntax in
   let%bind () = Schedule.validate schedule in
   let%bind () =
@@ -57,6 +79,22 @@ let create ~id ~account ~beneficiary ~rail ~amount ?(reference = "") ~schedule ~
     then Ok ()
     else Or_error.error_s [%message "rail cannot reach beneficiary" (rail : Rail.t)]
   in
+  let first_run = Schedule.next_on_or_after schedule start in
+  (* Build the first draft now, so a template the rail rejects fails here and not on
+     the first run date. *)
+  let%bind () =
+    let%bind run_details = details_for_run ~id ~run_date:first_run details in
+    Transfer.draft
+      ~id:(Transfer.Id.of_string "check")
+      ~rail
+      ~account
+      ~beneficiary
+      ~amount
+      ?details:run_details
+      ~now:Time_ns.epoch
+      ()
+    |> Or_error.map ~f:ignore
+  in
   let t =
     { id
     ; account
@@ -64,9 +102,10 @@ let create ~id ~account ~beneficiary ~rail ~amount ?(reference = "") ~schedule ~
     ; rail
     ; amount
     ; reference
+    ; details
     ; schedule
     ; until
-    ; next_run = Schedule.next_on_or_after schedule start
+    ; next_run = first_run
     ; status = Active
     ; runs = 0
     ; last_run = None
@@ -123,8 +162,10 @@ let run t ~now ~zone =
     let run_date = latest_due t.next_run in
     let id = Transfer.Id.of_string (sprintf "%s:%s" (Id.to_string t.id) (Date.to_string run_date)) in
     let open Or_error.Let_syntax in
+    let%bind details = details_for_run ~id:t.id ~run_date t.details in
     let%map draft =
       Transfer.draft
+        ?details
         ~id
         ~rail:t.rail
         ~account:t.account

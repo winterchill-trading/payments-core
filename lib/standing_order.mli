@@ -29,6 +29,7 @@ module Stable : sig
       ; rail : Rail.Stable.V1.t
       ; amount : Money.Amount.Stable.V1.t
       ; reference : string
+      ; details : Transfer.Details.t option
       ; schedule : Schedule.t
       ; until : Date.Stable.V1.t option (** last date a run may fall on *)
       ; next_run : Date.Stable.V1.t
@@ -47,6 +48,7 @@ type t = Stable.V1.t =
   ; rail : Rail.t
   ; amount : Money.Amount.t
   ; reference : string
+  ; details : Transfer.Details.t option
   ; schedule : Schedule.t
   ; until : Date.t option
   ; next_run : Date.t
@@ -56,8 +58,10 @@ type t = Stable.V1.t =
   }
 [@@deriving sexp, compare, equal]
 
-(** The first run is the first schedule date on or after [start]. Fails on an invalid
-    schedule, a non-positive amount, a beneficiary the rail cannot reach, or an [until]
+(** The first run is the first schedule date on or after [start]. [details] is the
+    template for each draft (required on SEPA rails); each run gets its own end-to-end
+    id, [<order id>-<run date>]. Fails on an invalid schedule, a non-positive amount, a
+    beneficiary the rail cannot reach, details the rail does not accept, or an [until]
     before the first run. *)
 val create
   :  id:Id.t
@@ -66,6 +70,7 @@ val create
   -> rail:Rail.t
   -> amount:Money.Amount.t
   -> ?reference:string
+  -> ?details:Transfer.Details.t
   -> schedule:Schedule.t
   -> start:Date.t
   -> ?until:Date.t
