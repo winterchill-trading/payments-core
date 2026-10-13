@@ -49,6 +49,11 @@ module Payment_id : sig
     -> unit
     -> t Or_error.t
   val not_provided : string
+
+  (** Our own identifiers for a new transfer: an end-to-end id derived from
+      [transfer_id] (characters outside the SEPA set become ['-'], slashes are made
+      legal, at most 35 characters) and a fresh UETR. *)
+  val generate : transfer_id:string -> Random.State.t -> t
 end
 
 module Creditor_reference : sig

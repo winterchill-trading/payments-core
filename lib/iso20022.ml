@@ -84,6 +84,30 @@ module Payment_id = struct
     in
     { end_to_end_id; instruction_id; uetr; tx_id; msg_id; pmt_inf_id }
   ;;
+
+  let generate ~transfer_id state =
+    let cleaned =
+      String.map transfer_id ~f:(fun c -> if Sepa_text.allowed c && not (Char.equal c ' ') then c else '-')
+      |> String.substr_replace_all ~pattern:"//" ~with_:"/-"
+      |> fun s -> String.prefix s 35
+    in
+    let trim_slash s =
+      let s = if String.is_prefix s ~prefix:"/" then "-" ^ String.drop_prefix s 1 else s in
+      if String.is_suffix s ~suffix:"/" then String.drop_suffix s 1 ^ "-" else s
+    in
+    let end_to_end_id =
+      match trim_slash cleaned with
+      | "" -> not_provided
+      | s -> s
+    in
+    { end_to_end_id
+    ; instruction_id = None
+    ; uetr = Some (Uetr.create state)
+    ; tx_id = None
+    ; msg_id = None
+    ; pmt_inf_id = None
+    }
+  ;;
 end
 
 module Creditor_reference = struct
