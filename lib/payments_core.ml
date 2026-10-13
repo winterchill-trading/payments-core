@@ -14,3 +14,4 @@ module Beneficiary = Beneficiary
 module Sca = Sca
 module Transfer = Transfer
 module Booking = Booking
+module Schedule = Schedule
