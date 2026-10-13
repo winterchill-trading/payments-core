@@ -22,6 +22,8 @@
   dune
   core
   async_kernel
+  cryptokit
+  zarith
   ppx_jane
   money
   ledger))
