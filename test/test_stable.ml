@@ -23,8 +23,8 @@ let%expect_test "stable bin_prot digests" =
     Crypto_address     43b704f271695d2835e803b2791b70ee
     Lightning.Target   3b138a460675950e7aa544c9dd14b78b
     Beneficiary        a75ca3f385560ca0ba4035db9d691422
-    Sca.Challenge      e26e93362c39647d10d9b681eef48828
-    Transfer           db8c7d038e225e9fe734377aee39ea79
+    Sca.Challenge      692de572288496b8a81cf5b64932add8
+    Transfer           5d0ea6cdb7be87a968a899269f33e433
     Standing_order     39121335464084124a22220017780c99
     |}]
 ;;
@@ -65,6 +65,6 @@ let%expect_test "a transfer round trips through bin_prot and sexp" =
      (status Submitted)
      (history
       ((Submitted "2026-10-13 09:00:01Z") (Draft "2026-10-13 09:00:00Z")))
-     (sca ()) (provider_ref (p-1)))
+     (authorization ((Exempt Low_value_remote))) (provider_ref (p-1)))
     |}]
 ;;

@@ -109,6 +109,7 @@ let%expect_test "Lightning settles only on the matching preimage" =
       ()
     |> Or_error.ok_exn
   in
+  let t = Transfer.exempt t ~exemption:Trusted_beneficiary |> Or_error.ok_exn in
   let t = Transfer.submit t ~at:(at 1) () |> Or_error.ok_exn in
   print_s [%sexp (Transfer.settle_lightning t ~preimage:(String.make 64 '1') ~at:(at 2) |> Result.map ~f:(fun t -> t.details) : Transfer.Details.t Or_error.t)];
   print_s [%sexp (Transfer.settle_lightning t ~preimage ~at:(at 2) |> Result.map ~f:(fun t -> t.status, t.details) : (Transfer.Status.t * Transfer.Details.t) Or_error.t)];

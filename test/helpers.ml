@@ -52,6 +52,7 @@ let draft ?(rail = Rail.Sepa_credit) ?(amount = "25.00") ?(fee = "0.50") () =
     ~reference:"invoice 42"
     ~now:t0
     ()
+  |> Or_error.bind ~f:(Transfer.exempt ~exemption:Low_value_remote)
   |> Or_error.ok_exn
 ;;
 
