@@ -154,7 +154,30 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
             ~event_id
             ~t
             ~at)
-  | Out, (Submitted | Pending), (Failed _ | Rejected _) -> [ release ~event_id ~t ~at ]
+  | Out, (Submitted | Pending), (Failed _ | Rejected _ | Timed_out) ->
+    [ release ~event_id ~t ~at ]
+  (* A settlement confirmed after the SCT Inst time-out: the hold is gone, so the
+     payment is booked as a fresh debit. It can fail if the customer has spent the
+     released funds meanwhile; the caller then has a case to open, not an entry. *)
+  | Out, Timed_out, Settled ->
+    transfer_entry
+      ~tag:"late-settlement"
+      ~event_id
+      ~t
+      ~at
+      ~debit:t.account
+      ~credit:(settlement chart t)
+      t.amount
+    :: fee_legs
+         t
+         (transfer_entry
+            ~tag:"fee"
+            ~event_id
+            ~t
+            ~at
+            ~debit:t.account
+            ~credit:(chart.fee_income (currency t))
+            t.fee)
   | Out, (Settled | Recall_requested _), (Returned _ | Recalled) ->
     [ transfer_entry
         ~tag:"return"
@@ -166,6 +189,28 @@ let legs (chart : Chart.t) ~(t : Transfer.t) ~(to_ : Transfer.Status.t) ~event_i
         t.amount
     ]
   | In, Pending, Settled -> deposit_legs chart ~event_id ~t ~at
+  (* A credited deposit whose block was orphaned: take the credit (and the fee) back
+     until the transaction confirms again. *)
+  | In, Settled, Reorged ->
+    fee_legs
+      t
+      (transfer_entry
+         ~tag:"reorg-fee-refund"
+         ~event_id
+         ~t
+         ~at
+         ~debit:(chart.fee_income (currency t))
+         ~credit:t.account
+         t.fee)
+    @ [ transfer_entry
+          ~tag:"reorg"
+          ~event_id
+          ~t
+          ~at
+          ~debit:t.account
+          ~credit:(settlement chart t)
+          t.amount
+      ]
   | In, (Settled | Recall_requested _), (Returned _ | Recalled) ->
     (* Sending an incoming payment back undoes it, so the fee charged on arrival is
        refunded first; otherwise a customer who received exactly the amount could not
