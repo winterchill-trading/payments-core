@@ -6,3 +6,4 @@ module Iban = Iban
 module Bic = Bic
 module Base58 = Base58
 module Bech32 = Bech32
+module Crypto_address = Crypto_address
