@@ -7,6 +7,7 @@ let%expect_test "stable bin_prot digests" =
   List.iter
     [ "Network", [%bin_digest: Network.Stable.V1.t]
     ; "Rail", [%bin_digest: Rail.Stable.V1.t]
+    ; "Rail V2", [%bin_digest: Rail.Stable.V2.t]
     ; "Iban", [%bin_digest: Iban.Stable.V1.t]
     ; "Crypto_address", [%bin_digest: Crypto_address.Stable.V1.t]
     ; "Lightning.Target", [%bin_digest: Lightning.Target.Stable.V1.t]
@@ -20,6 +21,7 @@ let%expect_test "stable bin_prot digests" =
     {|
     Network            180a350eb7c08de68cbf9d0f401227c7
     Rail               8dfb73bd6a838ed1c3162c265c00348e
+    Rail V2            2e597fed04a0c57f1747f3e896a3bde8
     Iban               d9a8da25d5656b016fb4dbdc2e4197fb
     Crypto_address     43b704f271695d2835e803b2791b70ee
     Lightning.Target   3b138a460675950e7aa544c9dd14b78b
@@ -68,5 +70,31 @@ let%expect_test "a transfer round trips through bin_prot and sexp" =
      (history
       ((Submitted "2026-10-13 09:00:01Z") (Draft "2026-10-13 09:00:00Z")))
      (authorization ((Exempt Low_value_remote))) (provider_ref (p-1)))
+    |}]
+;;
+
+(* The UK rails were appended after the original six, so every rail V1 can hold is written
+   the same way by V2, and old bytes read through either version. *)
+let%test_unit "Rail V1 bytes are V2 bytes" =
+  Quickcheck.test Rail.Stable.V1.quickcheck_generator ~f:(fun rail ->
+    let v1 = Bin_prot.Writer.to_string Rail.Stable.V1.bin_writer_t rail in
+    [%test_result: string]
+      (Bin_prot.Writer.to_string Rail.Stable.V2.bin_writer_t rail)
+      ~expect:v1;
+    [%test_result: Rail.t]
+      (Bin_prot.Reader.of_string Rail.Stable.V2.bin_reader_t v1)
+      ~expect:rail)
+;;
+
+let%expect_test "Rail V1 refuses the UK rails" =
+  List.iter [ Rail.Faster_payments; Chaps; Bacs ] ~f:(fun rail ->
+    Expect_test_helpers_core.require_does_raise (fun () ->
+      Bin_prot.Writer.to_string Rail.Stable.V1.bin_writer_t rail));
+  [%expect
+    {|
+    ("Rail.Stable.V1 cannot hold this rail; write Rail.Stable.V2"
+     (rail Faster_payments))
+    ("Rail.Stable.V1 cannot hold this rail; write Rail.Stable.V2" (rail Chaps))
+    ("Rail.Stable.V1 cannot hold this rail; write Rail.Stable.V2" (rail Bacs))
     |}]
 ;;
