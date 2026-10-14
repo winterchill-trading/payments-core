@@ -98,10 +98,103 @@ module Counterparty = struct
         ; detail : string
         }
   [@@deriving bin_io, sexp, compare, equal]
+
+  module Stable = struct
+    module V1 = struct
+      type nonrec t = t [@@deriving bin_io, sexp, compare, equal]
+    end
+
+    module V2 = struct
+      type nonrec t = t =
+        | Beneficiary of Beneficiary.Stable.V2.t
+        | External of
+            { name : string
+            ; detail : string
+            }
+      [@@deriving bin_io, sexp, compare, equal]
+    end
+  end
 end
 
 module Details = struct
-  type t =
+  module T = struct
+    type t =
+      | Sepa of Sepa.Details.Stable.V1.t
+      | Onchain of
+          { travel_rule : Travel_rule.Stable.V1.t option
+          ; tx_hash : string option
+          ; block_hash : string option
+          ; confirmations : int
+          ; finalized : bool
+          }
+      | Lightning of
+          { payment_hash : string option
+          ; preimage : string option
+          }
+      | Intraledger
+      | Card
+      | Uk_domestic of Uk_scheme.Details.Stable.V1.t
+    [@@deriving bin_io, sexp, compare, equal]
+  end
+
+  module Stable = struct
+    module V2 = T
+
+    module V1 = struct
+      (* The original five constructors: the bin_prot shape and digest come from here. *)
+      module Repr = struct
+        type t =
+          | Sepa of Sepa.Details.Stable.V1.t
+          | Onchain of
+              { travel_rule : Travel_rule.Stable.V1.t option
+              ; tx_hash : string option
+              ; block_hash : string option
+              ; confirmations : int
+              ; finalized : bool
+              }
+          | Lightning of
+              { payment_hash : string option
+              ; preimage : string option
+              }
+          | Intraledger
+          | Card
+        [@@deriving bin_io]
+      end
+
+      type t = T.t [@@deriving sexp, compare, equal]
+
+      include
+        Binable.Of_binable_without_uuid [@alert "-legacy"]
+          (Repr)
+          (struct
+            type nonrec t = t
+
+            let to_binable : t -> Repr.t = function
+              | Sepa d -> Sepa d
+              | Onchain { travel_rule; tx_hash; block_hash; confirmations; finalized } ->
+                Onchain { travel_rule; tx_hash; block_hash; confirmations; finalized }
+              | Lightning { payment_hash; preimage } -> Lightning { payment_hash; preimage }
+              | Intraledger -> Intraledger
+              | Card -> Card
+              | Uk_domestic _ ->
+                raise_s
+                  [%message
+                    "Transfer.Details.Stable.V1 cannot hold UK details; write V2"]
+            ;;
+
+            let of_binable : Repr.t -> t = function
+              | Sepa d -> Sepa d
+              | Onchain { travel_rule; tx_hash; block_hash; confirmations; finalized } ->
+                Onchain { travel_rule; tx_hash; block_hash; confirmations; finalized }
+              | Lightning { payment_hash; preimage } -> Lightning { payment_hash; preimage }
+              | Intraledger -> Intraledger
+              | Card -> Card
+            ;;
+          end)
+    end
+  end
+
+  type t = T.t =
     | Sepa of Sepa.Details.Stable.V1.t
     | Onchain of
         { travel_rule : Travel_rule.Stable.V1.t option
@@ -116,21 +209,45 @@ module Details = struct
         }
     | Intraledger
     | Card
-  [@@deriving bin_io, sexp, compare, equal]
+    | Uk_domestic of Uk_scheme.Details.Stable.V1.t
+  [@@deriving sexp, compare, equal]
+
+  include (Stable.V1 : Binable.S with type t := t)
 end
 
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
+      { id : Id.Stable.V1.t
+      ; direction : Direction.t
+      ; rail : Rail.Stable.V2.t
+      ; account : Ledger.Account_id.Stable.V1.t
+      ; counterparty : Counterparty.Stable.V2.t
+      ; amount : Money.Amount.Stable.V1.t
+      ; fee : Money.Amount.Stable.V1.t
+      ; reference : string
+      ; details : Details.Stable.V2.t
+      ; status : Status.t
+      ; history : (Status.t * Utc_time.Stable.V1.t) list
+      ; authorization : Sca.Authorization.t option
+      ; provider_ref : string option
+      }
+    [@@deriving bin_io, sexp, compare, equal]
+  end
+
+  module V1 = struct
+    (* Same record as V2; only the field formats differ, so the shape (and digest) is the
+       original one. *)
+    type t = V2.t =
       { id : Id.Stable.V1.t
       ; direction : Direction.t
       ; rail : Rail.Stable.V1.t
       ; account : Ledger.Account_id.Stable.V1.t
-      ; counterparty : Counterparty.t
+      ; counterparty : Counterparty.Stable.V1.t
       ; amount : Money.Amount.Stable.V1.t
       ; fee : Money.Amount.Stable.V1.t
       ; reference : string
-      ; details : Details.t
+      ; details : Details.Stable.V1.t
       ; status : Status.t
       ; history : (Status.t * Utc_time.Stable.V1.t) list
       ; authorization : Sca.Authorization.t option
@@ -163,10 +280,39 @@ let check_details
   ~amount
   ?creditor_iban
   ?eur_value
+  ?(reference = "")
+  ?(uk_rules = Uk_scheme.Rules.default)
+  ?(now = Time_ns.epoch)
   details
   =
   let open Or_error.Let_syntax in
   match Sepa.Scheme.of_rail rail, (details : Details.t option), (rail : Rail.t) with
+  | None, (None | Some (Uk_domestic _)), (Faster_payments | Chaps | Bacs) ->
+    let scheme = Uk_scheme.Scheme.of_rail rail |> Option.value_exn in
+    let%bind () =
+      match direction with
+      (* Limits and reference rules bind what we send; an incoming payment already
+         passed them at the sender's bank, so only the currency is checked. *)
+      | Out -> Uk_scheme.validate ~rules:uk_rules scheme ~amount ~reference
+      | In ->
+        if Money.Currency.equal (Money.Amount.currency amount) Money.Currency.gbp
+        then Ok ()
+        else
+          Or_error.error_s
+            [%message "UK domestic payments are in GBP" (amount : Money.Amount.t)]
+    in
+    let d =
+      match details with
+      | Some (Uk_domestic d) -> d
+      | _ -> Uk_scheme.Details.empty
+    in
+    let%map value_date =
+      match scheme, d.value_date, direction with
+      (* An outgoing CHAPS payment gets same-day value until the cut-off. *)
+      | Chaps, None, Out -> Uk_scheme.chaps_value_date uk_rules ~now >>| Option.some
+      | _ -> Ok d.value_date
+    in
+    Details.Uk_domestic { d with value_date }
   | Some scheme, Some (Sepa d), _ ->
     let%bind () = Sepa.validate scheme d ~amount in
     let%map () =
@@ -213,6 +359,7 @@ let draft
   ?(reference = "")
   ?details
   ?eur_value
+  ?uk_rules
   ~now
   ()
   =
@@ -244,7 +391,16 @@ let draft
     | d, _ -> d
   in
   let%map details =
-    check_details ~direction:Out ~rail ~amount ?creditor_iban ?eur_value details
+    check_details
+      ~direction:Out
+      ~rail
+      ~amount
+      ?creditor_iban
+      ?eur_value
+      ~reference
+      ?uk_rules
+      ~now
+      details
   in
   { id
   ; direction = Out

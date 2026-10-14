@@ -82,6 +82,24 @@ module Counterparty : sig
         ; detail : string (** IBAN, address or invoice the funds came from *)
         } (** incoming: who paid us, as reported *)
   [@@deriving bin_io, sexp, compare, equal]
+
+  (** [bin_io] on [t] is {!Stable.V1}. *)
+  module Stable : sig
+    module V1 : sig
+      (** A beneficiary in {!Beneficiary.Stable.V1}: a UK account destination raises. *)
+      type nonrec t = t [@@deriving bin_io, sexp, compare, equal]
+    end
+
+    module V2 : sig
+      type nonrec t = t =
+        | Beneficiary of Beneficiary.Stable.V2.t
+        | External of
+            { name : string
+            ; detail : string
+            }
+      [@@deriving bin_io, sexp, compare, equal]
+    end
+  end
 end
 
 module Details : sig
@@ -100,22 +118,38 @@ module Details : sig
         }
     | Intraledger
     | Card
-  [@@deriving bin_io, sexp, compare, equal]
+    | Uk_domestic of Uk_scheme.Details.Stable.V1.t
+    (** Faster Payments, CHAPS and Bacs: the scheme's id and the value date *)
+  [@@deriving sexp, compare, equal]
+
+  (** [bin_io] on [t] is {!Stable.V1}, so records that embed details keep their format. *)
+  include Binable.S with type t := t
+
+  module Stable : sig
+    module V2 : sig
+      type nonrec t = t [@@deriving bin_io, sexp, compare, equal]
+    end
+
+    module V1 : sig
+      (** The first five kinds' format; writing [Uk_domestic] raises. *)
+      type nonrec t = t [@@deriving bin_io, sexp, compare, equal]
+    end
+  end
 end
 
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t =
       { id : Id.Stable.V1.t
       ; direction : Direction.t
-      ; rail : Rail.Stable.V1.t
+      ; rail : Rail.Stable.V2.t
       ; account : Ledger.Account_id.Stable.V1.t
       (** the customer account debited (Out) or credited (In) *)
-      ; counterparty : Counterparty.t
+      ; counterparty : Counterparty.Stable.V2.t
       ; amount : Money.Amount.Stable.V1.t (** positive, what the counterparty receives *)
       ; fee : Money.Amount.Stable.V1.t (** same currency, zero when free *)
       ; reference : string (** free text shown to the customer *)
-      ; details : Details.t
+      ; details : Details.Stable.V2.t
       ; status : Status.t
       ; history : (Status.t * Utc_time.Stable.V1.t) list (** newest first *)
       ; authorization : Sca.Authorization.t option
@@ -123,9 +157,30 @@ module Stable : sig
       }
     [@@deriving bin_io, sexp, compare, equal]
   end
+
+  module V1 : sig
+    (** The format before the UK rails (digest [5d0ea6cd…]): writing a UK rail, a UK
+        account beneficiary or UK details raises. *)
+    type t = V2.t =
+      { id : Id.Stable.V1.t
+      ; direction : Direction.t
+      ; rail : Rail.Stable.V1.t
+      ; account : Ledger.Account_id.Stable.V1.t
+      ; counterparty : Counterparty.Stable.V1.t
+      ; amount : Money.Amount.Stable.V1.t
+      ; fee : Money.Amount.Stable.V1.t
+      ; reference : string
+      ; details : Details.Stable.V1.t
+      ; status : Status.t
+      ; history : (Status.t * Utc_time.Stable.V1.t) list
+      ; authorization : Sca.Authorization.t option
+      ; provider_ref : string option
+      }
+    [@@deriving bin_io, sexp, compare, equal]
+  end
 end
 
-type t = Stable.V1.t =
+type t = Stable.V2.t =
   { id : Id.t
   ; direction : Direction.t
   ; rail : Rail.t
@@ -146,8 +201,11 @@ type t = Stable.V1.t =
     currency, a beneficiary the rail cannot reach, or details that do not fit the rail:
     SEPA rails need valid {!Sepa.Details} whose creditor IBAN is the beneficiary's;
     on-chain transfers need a travel-rule record that passes {!Travel_rule.check}
-    ([eur_value] is the amount's EUR value for the self-hosted wallet threshold). Other
-    rails get their details filled in when omitted. *)
+    ([eur_value] is the amount's EUR value for the self-hosted wallet threshold); UK
+    rails need GBP and pass {!Uk_scheme.validate} under [uk_rules] (default
+    {!Uk_scheme.Rules.default}), and a CHAPS draft without a value date gets
+    {!Uk_scheme.chaps_value_date} at [now]. Other rails get their details filled in when
+    omitted. *)
 val draft
   :  id:Id.t
   -> rail:Rail.t
@@ -158,6 +216,7 @@ val draft
   -> ?reference:string
   -> ?details:Details.t
   -> ?eur_value:Money.Amount.t
+  -> ?uk_rules:Uk_scheme.Rules.t
   -> now:Time_ns.t
   -> unit
   -> t Or_error.t
