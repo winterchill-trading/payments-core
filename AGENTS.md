@@ -82,6 +82,10 @@ from that repository.
   `Destination.Local` and `Beneficiary.postal_address` went into `Stable.V3`, with V2
   rebuilt over a `Repr` of its old shape. Store beneficiaries, transfers and standing
   orders with V3 when they can hold a local destination or an address.
+- `Destination.check_local` decides with `create_local` and only then asks the
+  per-field checks, so the two can never disagree on validity
+  (`test/test_local_field_errors.ml` has a property for it). A new format's
+  `with_field_errors` hook should name every field its `validate` can refuse.
 - A transfer's hold, fee and capture are booked as one linked group: all or nothing.
 - `Swap.Quote.t` has public fields and `Swap.execute` does not recompute amounts from the rate; build
   the record directly when a pricing rule must apply.
