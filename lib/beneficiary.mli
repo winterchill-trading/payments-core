@@ -115,6 +115,29 @@ module Destination : sig
     val ch_qr_iban : string
   end
 
+  (** One problem with a local destination, for a form to show next to the input it is
+      about. *)
+  module Field_error : sig
+    type t =
+      { field : string option
+      (** the field name, such as [account_number]; [None] for a problem with the
+          destination as a whole (the scheme name, no fields at all, a format hook that
+          does not say which field) *)
+      ; reason : string (** short English text, such as ["expected 16 digits"] *)
+      }
+    [@@deriving sexp, compare, equal]
+  end
+
+  (** Why {!check_local} refused a local destination. *)
+  module Local_error : sig
+    type t =
+      { summary : Error.t (** the error {!create_local} gives *)
+      ; fields : Field_error.t list
+      (** every problem found, in field order; never empty *)
+      }
+    [@@deriving sexp_of]
+  end
+
   (** Validation hooks, one per scheme: a format checks and normalises the fields of a
       local destination before it is accepted. *)
   module Local_format : sig
@@ -131,12 +154,22 @@ module Destination : sig
     val scheme : t -> string
     val validate : t -> (string * string) list -> (string * string) list Or_error.t
 
+    (** The format with a per-field check: [f] gets the same fields as [validate] and
+        lists each problem with the field it concerns. It is consulted only after
+        [validate] has refused, so it explains a refusal and never decides one. *)
+    val with_field_errors : t -> f:((string * string) list -> Field_error.t list) -> t
+
+    (** The problems [t] finds in [fields], by field. A format without
+        {!with_field_errors} reports its [validate] error once, with no field. *)
+    val field_errors : t -> (string * string) list -> Field_error.t list
+
     (** {!Local_scheme.kg}: exactly [bank_code] (six digits) and [account_number] (sixteen
-        digits), spaces removed, returned in that order. *)
+        digits), spaces removed, returned in that order. Reports field errors. *)
     val kg : t
 
     (** {!Local_scheme.ch_qr_iban}: exactly [qr_iban], a valid CH or LI IBAN whose
-        institution id is in the QR range 30000-31999, stored in electronic form. *)
+        institution id is in the QR range 30000-31999, stored in electronic form. Reports
+        field errors. *)
     val ch_qr_iban : t
 
     (** [[kg; ch_qr_iban]]. *)
@@ -153,6 +186,23 @@ module Destination : sig
     -> scheme:string
     -> (string * string) list
     -> t Or_error.t
+  (** {!create_local}, reporting a refusal field by field as well as by the summary error
+      [create_local] gives:
+
+      {[
+        Destination.check_local ~scheme:Destination.Local_scheme.kg
+          [ "bank_code", "10901"; "account_number", "1090000123456789" ]
+        (* Error { fields = [ { field = Some "bank_code"; reason = "expected 6 digits" } ]
+                 ; summary = ... } *)
+      ]}
+
+      Generic problems (field names, empty values, duplicates) are listed for every field
+      that has one; the scheme's format is consulted once those pass. *)
+  val check_local
+    :  ?formats:Local_format.t list
+    -> scheme:string
+    -> (string * string) list
+    -> (t, Local_error.t) Result.t
 end
 
 (** A structured postal address (ISO 20022 style: country, town, optional post code,

@@ -287,15 +287,65 @@ module Destination = struct
     let ch_qr_iban = "ch_qr_iban"
   end
 
+  module Field_error = struct
+    type t =
+      { field : string option
+      ; reason : string
+      }
+    [@@deriving sexp, compare, equal]
+  end
+
+  module Local_error = struct
+    type t =
+      { summary : Error.t
+      ; fields : Field_error.t list
+      }
+    [@@deriving sexp_of]
+  end
+
   module Local_format = struct
     type t =
       { scheme : string
       ; validate : (string * string) list -> (string * string) list Or_error.t
+      ; field_errors : ((string * string) list -> Field_error.t list) option
       }
 
-    let create ~scheme ~validate = { scheme; validate }
+    let create ~scheme ~validate = { scheme; validate; field_errors = None }
+    let with_field_errors t ~f = { t with field_errors = Some f }
     let scheme t = t.scheme
     let validate t fields = t.validate fields
+
+    let field_errors t fields =
+      match t.field_errors with
+      | Some f -> f fields
+      | None ->
+        (match t.validate fields with
+         | Ok _ -> []
+         | Error e -> [ { Field_error.field = None; reason = Error.to_string_hum e } ])
+    ;;
+
+    let error field reason = { Field_error.field = Some field; reason }
+
+    (* Per-field form of [exactly]: each missing name and each unexpected one. *)
+    let expected_fields names fields =
+      let given = List.map fields ~f:fst in
+      List.filter_map names ~f:(fun n ->
+        if List.mem given n ~equal:String.equal then None else Some (error n "missing"))
+      @ List.filter_map given ~f:(fun n ->
+        if List.mem names n ~equal:String.equal
+        then None
+        else Some (error n "unexpected field"))
+    ;;
+
+    let digit_errors ~field ~length fields =
+      match List.Assoc.find fields field ~equal:String.equal with
+      | None -> []
+      | Some value ->
+        let value = String.filter value ~f:(fun c -> not (Char.is_whitespace c)) in
+        if String.length value = length && String.for_all value ~f:Char.is_digit
+        then []
+        else [ error field (sprintf "expected %d digits" length) ]
+    ;;
 
     let digits ~field ~length value =
       if String.length value = length && String.for_all value ~f:Char.is_digit
@@ -319,8 +369,33 @@ module Destination = struct
 
     let without_spaces s = String.filter s ~f:(fun c -> not (Char.is_whitespace c))
 
+    let kg_field_errors fields =
+      expected_fields [ "bank_code"; "account_number" ] fields
+      @ digit_errors ~field:"bank_code" ~length:6 fields
+      @ digit_errors ~field:"account_number" ~length:16 fields
+    ;;
+
+    let qr_iban_field_errors fields =
+      expected_fields [ "qr_iban" ] fields
+      @
+      match List.Assoc.find fields "qr_iban" ~equal:String.equal with
+      | None -> []
+      | Some value ->
+        (match Iban.of_string value with
+         | Error e -> [ error "qr_iban" (Error.to_string_hum e) ]
+         | Ok iban ->
+           (match Iban.country iban with
+            | "CH" | "LI" ->
+              let iid = Int.of_string_opt (String.prefix (Iban.bban iban) 5) in
+              (match iid with
+               | Some iid when iid >= 30000 && iid <= 31999 -> []
+               | _ -> [ error "qr_iban" "not a QR-IBAN" ])
+            | _ -> [ error "qr_iban" "QR-IBAN outside CH and LI" ]))
+    ;;
+
     let kg =
-      create ~scheme:Local_scheme.kg ~validate:(fun fields ->
+      with_field_errors ~f:kg_field_errors
+      @@ create ~scheme:Local_scheme.kg ~validate:(fun fields ->
         let open Or_error.Let_syntax in
         let%bind fields = exactly [ "bank_code"; "account_number" ] fields in
         let fields = List.map fields ~f:(fun (n, v) -> n, without_spaces v) in
@@ -332,7 +407,8 @@ module Destination = struct
     ;;
 
     let ch_qr_iban =
-      create ~scheme:Local_scheme.ch_qr_iban ~validate:(fun fields ->
+      with_field_errors ~f:qr_iban_field_errors
+      @@ create ~scheme:Local_scheme.ch_qr_iban ~validate:(fun fields ->
         let open Or_error.Let_syntax in
         let%bind fields = exactly [ "qr_iban" ] fields in
         let%bind iban = Iban.of_string (snd (List.hd_exn fields)) in
@@ -396,6 +472,59 @@ module Destination = struct
         |> Or_error.tag_s ~tag:[%message "local destination" scheme]
     in
     Local { scheme; fields }
+  ;;
+
+  (* Every problem [create_local] would report, one per field where it belongs to one;
+     only computed once [create_local] has refused, so the two never disagree on whether
+     the destination is valid. *)
+  let local_field_errors ~formats ~scheme fields =
+    let whole reason = { Field_error.field = None; reason } in
+    let fields = List.map fields ~f:(fun (n, v) -> n, String.strip v) in
+    let scheme_errors =
+      if is_snake_name scheme
+      then []
+      else [ whole "local scheme must be lower snake case" ]
+    in
+    let generic =
+      if List.is_empty fields
+      then [ whole "no fields" ]
+      else (
+        let per_field =
+          List.concat_map fields ~f:(fun (n, v) ->
+            if not (is_snake_name n)
+            then [ Local_format.error n "field name must be lower snake case" ]
+            else if String.is_empty v
+            then [ Local_format.error n "empty field" ]
+            else [])
+        in
+        let dups =
+          List.find_all_dups (List.map fields ~f:fst) ~compare:String.compare
+          |> List.map ~f:(fun n -> Local_format.error n "duplicate field")
+        in
+        per_field @ dups)
+    in
+    match scheme_errors @ generic with
+    | _ :: _ as errors -> errors
+    | [] ->
+      (match
+         List.find formats ~f:(fun (f : Local_format.t) -> String.equal f.scheme scheme)
+       with
+       | None -> []
+       | Some format -> Local_format.field_errors format fields)
+  ;;
+
+  let check_local ?(formats = Local_format.defaults) ~scheme fields =
+    match create_local ~formats ~scheme fields with
+    | Ok t -> Ok t
+    | Error summary ->
+      let fields =
+        match local_field_errors ~formats ~scheme fields with
+        | [] ->
+          (* A format hook that refuses without naming a field. *)
+          [ { Field_error.field = None; reason = Error.to_string_hum summary } ]
+        | errors -> errors
+      in
+      Error { Local_error.summary; fields }
   ;;
 end
 
