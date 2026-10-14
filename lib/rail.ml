@@ -131,6 +131,9 @@ let expected_settlement = function
   (* Six Bitcoin confirmations take about an hour; fee spikes can take much longer. *)
   | Onchain (Bitcoin | Bitcoin_testnet) -> Time_ns.Span.of_hr 2.
   | Onchain (Ethereum | Polygon | Tron | Solana) -> Time_ns.Span.of_min 10.
+  (* L2 finality waits for the Ethereum batch, around 20 minutes to finalized. *)
+  | Onchain (Base | Arbitrum) -> Time_ns.Span.of_min 30.
+  | Onchain (Plasma | Spark) -> Time_ns.Span.of_min 1.
   | Lightning -> Time_ns.Span.of_min 1.
   | Intraledger -> Time_ns.Span.of_sec 1.
   | Card_scheme -> Time_ns.Span.of_day 3.

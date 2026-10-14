@@ -26,6 +26,12 @@ let required (network : Network.t) ~eur_value =
      Solana's "finalized" commitment is about 32 slots. *)
   | Tron -> Confirmations 19
   | Solana -> Finalized
+  (* Base and Arbitrum post to Ethereum: their "finalized" block tag follows the L1 batch.
+     Plasma's BFT consensus finalizes each block. *)
+  | Base | Arbitrum | Plasma -> Finalized
+  (* A Spark transfer is final once the operators have signed it; there are no blocks to
+     count. *)
+  | Spark -> Finalized
 ;;
 
 let is_met t ~confirmations ~finalized =
