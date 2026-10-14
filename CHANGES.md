@@ -39,6 +39,21 @@ All notable changes to this project are documented here. The format follows
 - Networks `Base`, `Arbitrum`, `Plasma` (EVM addresses) and `Spark` (Bech32m, prefix and
   checksum only) in `Network.Stable.V2`, with `Crypto_address.Stable.V2`, confirmation
   policies and settlement times.
+- `Beneficiary.Destination.Local { scheme; fields }` for account details in a market's
+  own format (the shape of a local address in banking-provider), built with
+  `Beneficiary.create_local` / `Destination.create_local`. `Destination.Local_format`
+  gives per-scheme validation hooks; `kg` (six-digit BIK as `bank_code`, sixteen-digit
+  `account_number`) and `ch_qr_iban` (QR-IBAN range check) ship as defaults, and other
+  schemes pass generic checks. `Destination.local` reads the fields back. Local
+  destinations reach no rail in `Rail.t`.
+- `Beneficiary.postal_address` (an `Iso20022.Postal_address.t`, validated), set through
+  `create ?postal_address`, `create_local ?postal_address` or `with_postal_address`, and
+  `Beneficiary.check_for_rail ?address_required`, which also asks for the address on
+  `Fedwire` and `Chaps` by default (`default_address_required`).
+- `Stable.V3` of `Beneficiary`, `Beneficiary.Destination`, `Transfer`,
+  `Transfer.Counterparty` and `Standing_order`, which hold local destinations and
+  addresses. V2 and V1 keep their digests, read with no address, and raise on writing a
+  local destination or an address.
 
 ### Compatibility
 
