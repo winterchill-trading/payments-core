@@ -23,6 +23,11 @@ let%expect_test "stable bin_prot digests" =
     ; "Transfer V2", [%bin_digest: Transfer.Stable.V2.t]
     ; "Standing_order", [%bin_digest: Standing_order.Stable.V1.t]
     ; "Standing_order V2", [%bin_digest: Standing_order.Stable.V2.t]
+    ; "Destination V2", [%bin_digest: Beneficiary.Destination.Stable.V2.t]
+    ; "Destination V3", [%bin_digest: Beneficiary.Destination.Stable.V3.t]
+    ; "Beneficiary V3", [%bin_digest: Beneficiary.Stable.V3.t]
+    ; "Transfer V3", [%bin_digest: Transfer.Stable.V3.t]
+    ; "Standing_order V3", [%bin_digest: Standing_order.Stable.V3.t]
     ]
     ~f:(fun (name, digest) -> printf "%-18s %s\n" name digest);
   [%expect
@@ -45,6 +50,11 @@ let%expect_test "stable bin_prot digests" =
     Transfer V2        66c69aec0eb90148648f1fde8e873a6b
     Standing_order     39121335464084124a22220017780c99
     Standing_order V2  3d51c4973f10ad2fa929734d2b745ad0
+    Destination V2     52993a0e79b0d08349ce4147db1fdeb2
+    Destination V3     fd29ade86fca96b926eb651b63b57586
+    Beneficiary V3     556ee8156c429ae7803bfdb1fd11635c
+    Transfer V3        c61708f73324bc86d303b2309e342f51
+    Standing_order V3  6e5220ffab8fcadb0af727b7632b5a8c
     |}]
 ;;
 
