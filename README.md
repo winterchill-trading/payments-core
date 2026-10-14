@@ -1,7 +1,8 @@
 # payments-core
 
 Provider-neutral payment rails and transfer lifecycles in OxCaml: SEPA Credit Transfer
-and SCT Inst with their ISO 20022 fields and reason codes, on-chain transfers with
+and SCT Inst with their ISO 20022 fields and reason codes, UK Faster Payments, CHAPS and
+Bacs with sort codes and the published modulus check, on-chain transfers with
 travel-rule data, Lightning, intraledger moves; beneficiary validation; strong customer
 authentication; standing orders; currency swaps; and the pure booking rules that turn
 every transfer transition into balanced `ledger` entries. Reconciliation compares the
@@ -21,6 +22,8 @@ and `banking-provider` share one transfer type, without any of them knowing a pr
 opam exec -- dune build
 opam exec -- dune test
 opam exec -- dune exec payments -- iban "DE89 3704 0044 0532 0130 00"
+opam exec -- dune exec payments -- uk-account "04-00-04 12345678"
+opam exec -- dune exec payments -- uk-account -modulus valacdos.txt "08-99-99 66374958"
 opam exec -- dune exec payments -- address -network bitcoin bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4
 opam exec -- dune exec payments -- lightning satoshi@example.com
 opam exec -- dune exec payments -- schedule -monthly 31 -from 2027-01-15 -count 3
@@ -66,11 +69,13 @@ let pay ~balances ~beneficiary ~details ~now =
 
 | Module | What it is |
 | --- | --- |
-| `Rail`, `Network` | SEPA credit / instant, on-chain per network, Lightning, intraledger, card scheme |
+| `Rail`, `Network` | SEPA credit / instant, Faster Payments, CHAPS, Bacs, on-chain per network, Lightning, intraledger, card scheme |
+| `Sort_code`, `Uk_account`, `Uk_modulus` | UK sort codes, account numbers with roll numbers, GB IBAN conversion, the published modulus check |
+| `Uk_scheme` | Faster Payments limit (configurable), CHAPS cut-off hook and value dates, references, UK transfer details |
 | `Iban`, `Bic` | ISO 13616 IBAN (country lengths, mod 97, SEPA membership), ISO 9362 BIC |
 | `Crypto_address`, `Base58`, `Bech32` | per-network address checks (Base58Check, SegWit v0/v1+, EIP-55, Tron, Solana) |
 | `Lightning` | BOLT 11 invoices (network, amount, expiry, payment hash), LNURL, Lightning addresses |
-| `Beneficiary` | payee with destination, trusted flag, first seen, payee-name check result |
+| `Beneficiary` | payee with destination (IBAN, UK account, crypto, Lightning, internal), trusted flag, first seen, payee-name check result (match, close match, no match, not possible, account not found, unavailable) |
 | `Iso_reason`, `Iso20022` | reason codes with their R-transaction kinds; payment ids, UETR, creditor reference, remittance, parties, structured addresses, pacs.002 statuses, SEPA character set |
 | `Sepa`, `Target_calendar` | rulebook checks, reason lists per R-transaction, SCT Inst timing, return/recall deadlines in TARGET business days |
 | `Travel_rule`, `Confirmation_policy` | originator/beneficiary data per the EU transfer-of-funds rules; when a deposit counts |
@@ -93,9 +98,21 @@ let pay ~balances ~beneficiary ~details ~now =
 | ISO 11649 | creditor references | standard example, round-trip property |
 | ISO 17442 | LEI check digits | published LEI |
 | EPC SCT / SCT Inst 2025 | fields, reason codes, timing, deadlines | rulebook tables (see `docs/api-notes.md`) |
+| UK modulus checking (v8) | MOD10, MOD11, double alternate, exceptions 1 to 14 | the specification's 34 test cases over the matching lines of the v8.50 tables |
+| Faster Payments, CHAPS | GBP, FPS GBP 1m limit, CHAPS 18:00 close, references | scheme limits; bank cut-offs and holidays are inputs |
 
 Nothing here talks to a network, so there is nothing to verify live; all tests run on
 vectors and fixtures in CI.
+
+## Stable formats
+
+Each wire type has `Stable` versions with digests pinned in `test/test_stable.ml`. The UK
+additions made `Stable.V2` of `Rail`, `Beneficiary` (with its `Destination` and
+`Payee_check`), `Transfer` (with `Counterparty` and `Details`) and `Standing_order`. V1
+stays as it was, and the unversioned `bin_io` of these types is still the V1 format so
+records that embed them keep their digests; V1 refuses to write a UK rail, account or
+details (raises), and writes the two new payee check results as `Not_possible`. New
+constructors were appended, so V1 bytes are also valid V2 bytes.
 
 ## Known gaps
 
@@ -106,3 +123,11 @@ vectors and fixtures in CI.
 - The Tron and Solana deposit thresholds are our choice, not from a scheme document.
 - Business-day deadlines use the TARGET calendar only; national holidays are ignored.
 - Reconciliation breaks are values; persisting them is the caller's job.
+- The modulus check needs the published weight and substitution tables, which change
+  several times a year and are not bundled; without them every account is
+  `Not_checked`. Nine and ten digit account numbers (bank-specific conversions) are
+  refused.
+- UK bank holidays are not known: the default CHAPS cut-off covers weekends only, and a
+  bank passes its own hook. Faster Payments reason codes are not validated (any ISO
+  reason is accepted on UK rails).
+- Bacs is a stub: no files, service user numbers or processing calendar.
