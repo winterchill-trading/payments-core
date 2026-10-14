@@ -25,3 +25,4 @@ module Travel_rule = Travel_rule
 module Target_calendar = Target_calendar
 module Sepa = Sepa
 module Sort_code = Sort_code
+module Uk_modulus = Uk_modulus
