@@ -46,6 +46,36 @@ let address =
      fun () -> Crypto_address.create network raw |> print_result Crypto_address.sexp_of_t)
 ;;
 
+let uk_account =
+  Command.basic
+    ~summary:"Validate a UK sort code and account number (or a GB IBAN)"
+    (let%map_open.Command raw = anon ("ACCOUNT" %: string)
+     and weights =
+       flag
+         "modulus"
+         (optional string)
+         ~doc:"FILE the published weight table (valacdos.txt) for the modulus check"
+     and substitutions =
+       flag
+         "substitutions"
+         (optional string)
+         ~doc:"FILE the published sort code substitution table (scsubtab.txt)"
+     in
+     fun () ->
+       let modulus =
+         Option.map weights ~f:(fun file ->
+           Uk_modulus.Table.of_string
+             ?substitutions:(Option.map substitutions ~f:In_channel.read_all)
+             (In_channel.read_all file)
+           |> Or_error.ok_exn)
+       in
+       Uk_account.of_string ?modulus raw
+       |> print_result (fun a ->
+         [%message
+           (Uk_account.to_string a)
+             ~rails:(Beneficiary.Destination.rails (Uk_account a) : Rail.t list)]))
+;;
+
 let lightning =
   Command.basic
     ~summary:"Decode a Lightning invoice, LNURL or Lightning address"
@@ -237,6 +267,7 @@ let () =
     [ "iban", iban
     ; "bic", bic
     ; "address", address
+    ; "uk-account", uk_account
     ; "lightning", lightning
     ; "schedule", schedule
     ; "demo", demo
