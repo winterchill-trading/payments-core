@@ -8,7 +8,8 @@ Guide for AI coding agents working in this repository. Read this first; the subd
 
 `payments-core` models payment rails and transfer lifecycles without network access: SEPA credit
 and instant transfers with ISO 20022 fields and reason codes, on-chain transfers with travel-rule
-data and a confirmation policy, Lightning, and intraledger moves. It also covers beneficiaries,
+data and a confirmation policy, Lightning, intraledger moves, and the UK rails (Faster Payments,
+CHAPS, Bacs) with sort codes and the published modulus check. It also covers beneficiaries,
 strong customer authentication (SCA), standing orders, swaps, and the pure booking rules that turn
 each transfer transition into balanced `ledger` entries. A provider adapter maps its webhooks onto
 these states.
@@ -73,6 +74,10 @@ from that repository.
   stable times differs between a laptop and CI. Compare times as values, or print them in UTC.
 - SCT Inst times out after 10 seconds; a settlement that arrives late is booked as a fresh entry.
 - Five failed SCA attempts lock the challenge for 30 minutes.
+- The unversioned `bin_io` of `Rail`, `Beneficiary`, `Transfer.Details` and friends is the
+  V1 format (kept for digests elsewhere) and raises on UK values: store transfers with
+  `Transfer.Stable.V2`. A new constructor goes at the end of a V2 type, never into a
+  `Repr` module (those fix the V1 shape).
 - A transfer's hold, fee and capture are booked as one linked group: all or nothing.
 - `Swap.Quote.t` has public fields and `Swap.execute` does not recompute amounts from the rate; build
   the record directly when a pricing rule must apply.
