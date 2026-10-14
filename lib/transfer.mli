@@ -201,8 +201,8 @@ type t = Stable.V2.t =
     currency, a beneficiary the rail cannot reach, or details that do not fit the rail:
     SEPA rails need valid {!Sepa.Details} whose creditor IBAN is the beneficiary's;
     on-chain transfers need a travel-rule record that passes {!Travel_rule.check}
-    ([eur_value] is the amount's EUR value for the self-hosted wallet threshold); UK
-    rails need GBP and pass {!Uk_scheme.validate} under [uk_rules] (default
+    ([eur_value] is the amount's EUR value for the self-hosted wallet threshold); UK rails
+    need GBP and pass {!Uk_scheme.validate} under [uk_rules] (default
     {!Uk_scheme.Rules.default}), and a CHAPS draft without a value date gets
     {!Uk_scheme.chaps_value_date} at [now]. Other rails get their details filled in when
     omitted. *)

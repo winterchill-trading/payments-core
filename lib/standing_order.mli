@@ -40,8 +40,7 @@ module Stable : sig
   end
 
   module V1 : sig
-    (** The format before the UK rails: writing a UK rail, beneficiary or details
-        raises. *)
+    (** The format before the UK rails: writing a UK rail, beneficiary or details raises. *)
     type t = V2.t =
       { id : Id.Stable.V1.t
       ; account : Ledger.Account_id.Stable.V1.t

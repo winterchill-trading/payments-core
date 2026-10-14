@@ -173,20 +173,21 @@ module Details = struct
               | Sepa d -> Sepa d
               | Onchain { travel_rule; tx_hash; block_hash; confirmations; finalized } ->
                 Onchain { travel_rule; tx_hash; block_hash; confirmations; finalized }
-              | Lightning { payment_hash; preimage } -> Lightning { payment_hash; preimage }
+              | Lightning { payment_hash; preimage } ->
+                Lightning { payment_hash; preimage }
               | Intraledger -> Intraledger
               | Card -> Card
               | Uk_domestic _ ->
                 raise_s
-                  [%message
-                    "Transfer.Details.Stable.V1 cannot hold UK details; write V2"]
+                  [%message "Transfer.Details.Stable.V1 cannot hold UK details; write V2"]
             ;;
 
             let of_binable : Repr.t -> t = function
               | Sepa d -> Sepa d
               | Onchain { travel_rule; tx_hash; block_hash; confirmations; finalized } ->
                 Onchain { travel_rule; tx_hash; block_hash; confirmations; finalized }
-              | Lightning { payment_hash; preimage } -> Lightning { payment_hash; preimage }
+              | Lightning { payment_hash; preimage } ->
+                Lightning { payment_hash; preimage }
               | Intraledger -> Intraledger
               | Card -> Card
             ;;
@@ -291,8 +292,8 @@ let check_details
     let scheme = Uk_scheme.Scheme.of_rail rail |> Option.value_exn in
     let%bind () =
       match direction with
-      (* Limits and reference rules bind what we send; an incoming payment already
-         passed them at the sender's bank, so only the currency is checked. *)
+      (* Limits and reference rules bind what we send; an incoming payment already passed
+         them at the sender's bank, so only the currency is checked. *)
       | Out -> Uk_scheme.validate ~rules:uk_rules scheme ~amount ~reference
       | In ->
         if Money.Currency.equal (Money.Amount.currency amount) Money.Currency.gbp
