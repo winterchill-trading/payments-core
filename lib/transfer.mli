@@ -99,6 +99,18 @@ module Counterparty : sig
             }
       [@@deriving bin_io, sexp, compare, equal]
     end
+
+    module V3 : sig
+      (** A beneficiary in {!Beneficiary.Stable.V3}: local destinations and postal
+          addresses. *)
+      type nonrec t = t =
+        | Beneficiary of Beneficiary.Stable.V3.t
+        | External of
+            { name : string
+            ; detail : string
+            }
+      [@@deriving bin_io, sexp, compare, equal]
+    end
   end
 end
 
@@ -140,8 +152,30 @@ module Details : sig
 end
 
 module Stable : sig
-  module V2 : sig
+  module V3 : sig
     type t =
+      { id : Id.Stable.V1.t
+      ; direction : Direction.t
+      ; rail : Rail.Stable.V2.t
+      ; account : Ledger.Account_id.Stable.V1.t
+      (** the customer account debited (Out) or credited (In) *)
+      ; counterparty : Counterparty.Stable.V3.t
+      ; amount : Money.Amount.Stable.V1.t (** positive, what the counterparty receives *)
+      ; fee : Money.Amount.Stable.V1.t (** same currency, zero when free *)
+      ; reference : string (** free text shown to the customer *)
+      ; details : Details.Stable.V2.t
+      ; status : Status.t
+      ; history : (Status.t * Utc_time.Stable.V1.t) list (** newest first *)
+      ; authorization : Sca.Authorization.t option
+      ; provider_ref : string option (** the provider's id, once submitted *)
+      }
+    [@@deriving bin_io, sexp, compare, equal]
+  end
+
+  module V2 : sig
+    (** The format before local destinations and beneficiary addresses: writing such a
+        beneficiary raises. *)
+    type t = V3.t =
       { id : Id.Stable.V1.t
       ; direction : Direction.t
       ; rail : Rail.Stable.V2.t
@@ -182,7 +216,7 @@ module Stable : sig
   end
 end
 
-type t = Stable.V2.t =
+type t = Stable.V3.t =
   { id : Id.t
   ; direction : Direction.t
   ; rail : Rail.t

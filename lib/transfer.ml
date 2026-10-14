@@ -113,6 +113,16 @@ module Counterparty = struct
             }
       [@@deriving bin_io, sexp, compare, equal]
     end
+
+    module V3 = struct
+      type nonrec t = t =
+        | Beneficiary of Beneficiary.Stable.V3.t
+        | External of
+            { name : string
+            ; detail : string
+            }
+      [@@deriving bin_io, sexp, compare, equal]
+    end
   end
 end
 
@@ -220,8 +230,27 @@ module Details = struct
 end
 
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
+      { id : Id.Stable.V1.t
+      ; direction : Direction.t
+      ; rail : Rail.Stable.V2.t
+      ; account : Ledger.Account_id.Stable.V1.t
+      ; counterparty : Counterparty.Stable.V3.t
+      ; amount : Money.Amount.Stable.V1.t
+      ; fee : Money.Amount.Stable.V1.t
+      ; reference : string
+      ; details : Details.Stable.V2.t
+      ; status : Status.t
+      ; history : (Status.t * Utc_time.Stable.V1.t) list
+      ; authorization : Sca.Authorization.t option
+      ; provider_ref : string option
+      }
+    [@@deriving bin_io, sexp, compare, equal]
+  end
+
+  module V2 = struct
+    type t = V3.t =
       { id : Id.Stable.V1.t
       ; direction : Direction.t
       ; rail : Rail.Stable.V2.t
