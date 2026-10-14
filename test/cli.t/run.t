@@ -7,6 +7,16 @@ Validate payment details:
   [1]
   $ payments address -network tron TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
   ((network Tron) (address TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t))
+  $ payments uk-account "GB29 NWBK 6016 1331 9268 19"
+  ("60-16-13 31926819" (rails (Faster_payments Chaps Bacs)))
+  $ payments uk-account 04-00-04/1234567
+  ("04-00-04 01234567" (rails (Faster_payments Chaps Bacs)))
+  $ printf '089000 089999 MOD10 0 0 0 0 0 0 7 1 3 7 1 3 7 1\n' > weights.txt
+  $ payments uk-account -modulus weights.txt "08-99-99 66374959"
+  (invalid
+   ("account number fails the modulus check for its sort code"
+    (sort_code 08-99-99) (account_number 66374959)))
+  [1]
   $ payments lightning satoshi@example.com
   ((t (Address (user satoshi) (domain example.com)))
    (pay_url (https://example.com/.well-known/lnurlp/satoshi)))
