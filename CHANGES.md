@@ -28,12 +28,27 @@ All notable changes to this project are documented here. The format follows
   `Beneficiary.Payee_check`, `Transfer`, `Transfer.Counterparty`, `Transfer.Details` and
   `Standing_order`, with pinned digests.
 - `payments uk-account` command, with an optional modulus table.
+- US rails: `Rail.Ach { sec; same_day }` (NACHA standard entry class `Ppd`, `Ccd`, `Web`,
+  `Tel`, `Ctx`), `Rail.Rtp` and `Rail.Fedwire`, with `Rail.is_us`.
+- `Aba` (routing numbers with the check digit), `Us_account` (routing number, 4 to 17
+  digit account number, checking or savings), `Beneficiary.Destination.Us_account` and
+  `Destination.us_account`.
+- `Us_scheme`: USD only, a configurable RTP limit (at most the network's USD 10m), the
+  Same Day ACH limit (USD 1m), references, and `Details` (network id, ACH effective date);
+  `Transfer.Details.Us_domestic` and `Transfer.draft ?us_rules`.
+- Networks `Base`, `Arbitrum`, `Plasma` (EVM addresses) and `Spark` (Bech32m, prefix and
+  checksum only) in `Network.Stable.V2`, with `Crypto_address.Stable.V2`, confirmation
+  policies and settlement times.
 
 ### Compatibility
 
+- The `Stable.V2` formats above were pinned once for the UK additions and re-pinned for
+  the US rails and new networks in the same unreleased change set; none was released in
+  between.
 - Every existing `Stable.V1` digest is unchanged, and so is the format of the unversioned
   `bin_io` on these types (it is the V1 format), so records elsewhere that embed them keep
   their digests. The new constructors were appended, so V1 bytes read as V2.
-- Writing a UK rail, a UK account destination or UK details through a V1 format raises;
+- Writing a UK or US rail, a UK or US account, UK or US details, or anything on a newer
+  network through a V1 format raises;
   use V2 where those can occur. `Account_not_found` and `Unavailable` are written as
   `Not_possible` by V1.
