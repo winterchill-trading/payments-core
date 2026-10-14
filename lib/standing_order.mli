@@ -20,15 +20,15 @@ module Status : sig
 end
 
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t =
       { id : Id.Stable.V1.t
       ; account : Ledger.Account_id.Stable.V1.t
-      ; beneficiary : Beneficiary.Stable.V1.t
-      ; rail : Rail.Stable.V1.t
+      ; beneficiary : Beneficiary.Stable.V2.t
+      ; rail : Rail.Stable.V2.t
       ; amount : Money.Amount.Stable.V1.t
       ; reference : string
-      ; details : Transfer.Details.t option
+      ; details : Transfer.Details.Stable.V2.t option
       ; schedule : Schedule.t
       ; until : Date.Stable.V1.t option (** last date a run may fall on *)
       ; next_run : Date.Stable.V1.t
@@ -38,9 +38,30 @@ module Stable : sig
       }
     [@@deriving bin_io, sexp, compare, equal]
   end
+
+  module V1 : sig
+    (** The format before the UK rails: writing a UK rail, beneficiary or details
+        raises. *)
+    type t = V2.t =
+      { id : Id.Stable.V1.t
+      ; account : Ledger.Account_id.Stable.V1.t
+      ; beneficiary : Beneficiary.Stable.V1.t
+      ; rail : Rail.Stable.V1.t
+      ; amount : Money.Amount.Stable.V1.t
+      ; reference : string
+      ; details : Transfer.Details.Stable.V1.t option
+      ; schedule : Schedule.t
+      ; until : Date.Stable.V1.t option
+      ; next_run : Date.Stable.V1.t
+      ; status : Status.t
+      ; runs : int
+      ; last_run : Date.Stable.V1.t option
+      }
+    [@@deriving bin_io, sexp, compare, equal]
+  end
 end
 
-type t = Stable.V1.t =
+type t = Stable.V2.t =
   { id : Id.t
   ; account : Ledger.Account_id.t
   ; beneficiary : Beneficiary.t

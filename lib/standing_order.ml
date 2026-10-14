@@ -17,15 +17,36 @@ module Status = struct
 end
 
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
+      { id : Id.Stable.V1.t
+      ; account : Ledger.Account_id.Stable.V1.t
+      ; beneficiary : Beneficiary.Stable.V2.t
+      ; rail : Rail.Stable.V2.t
+      ; amount : Money.Amount.Stable.V1.t
+      ; reference : string
+      ; details : Transfer.Details.Stable.V2.t option
+      ; schedule : Schedule.t
+      ; until : Date.Stable.V1.t option
+      ; next_run : Date.Stable.V1.t
+      ; status : Status.t
+      ; runs : int
+      ; last_run : Date.Stable.V1.t option
+      }
+    [@@deriving bin_io, sexp, compare, equal]
+  end
+
+  module V1 = struct
+    (* Same record as V2; only the field formats differ, so the shape (and digest) is the
+       original one. *)
+    type t = V2.t =
       { id : Id.Stable.V1.t
       ; account : Ledger.Account_id.Stable.V1.t
       ; beneficiary : Beneficiary.Stable.V1.t
       ; rail : Rail.Stable.V1.t
       ; amount : Money.Amount.Stable.V1.t
       ; reference : string
-      ; details : Transfer.Details.t option
+      ; details : Transfer.Details.Stable.V1.t option
       ; schedule : Schedule.t
       ; until : Date.Stable.V1.t option
       ; next_run : Date.Stable.V1.t
@@ -37,7 +58,7 @@ module Stable = struct
   end
 end
 
-include Stable.V1
+include Stable.V2
 
 let past_until t date =
   match t.until with
