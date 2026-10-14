@@ -11,8 +11,15 @@ module Scheme = struct
     | Faster_payments -> Some Fps
     | Chaps -> Some Chaps
     | Bacs -> Some Bacs
-    | Sepa_credit | Sepa_instant | Onchain _ | Lightning | Intraledger | Card_scheme ->
-      None
+    | Sepa_credit
+    | Sepa_instant
+    | Onchain _
+    | Lightning
+    | Intraledger
+    | Card_scheme
+    | Ach _
+    | Rtp
+    | Fedwire -> None
   ;;
 
   let to_rail : t -> Rail.t = function

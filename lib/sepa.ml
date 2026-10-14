@@ -9,8 +9,16 @@ module Scheme = struct
   let of_rail : Rail.t -> t option = function
     | Sepa_credit -> Some Sct
     | Sepa_instant -> Some Sct_inst
-    | Onchain _ | Lightning | Intraledger | Card_scheme | Faster_payments | Chaps | Bacs
-      -> None
+    | Onchain _
+    | Lightning
+    | Intraledger
+    | Card_scheme
+    | Faster_payments
+    | Chaps
+    | Bacs
+    | Ach _
+    | Rtp
+    | Fedwire -> None
   ;;
 end
 

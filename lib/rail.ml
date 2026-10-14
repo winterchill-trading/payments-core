@@ -1,17 +1,35 @@
 open! Core
 
+module Ach_sec = struct
+  type t =
+    | Ppd
+    | Ccd
+    | Web
+    | Tel
+    | Ctx
+  [@@deriving bin_io, sexp, compare, equal, hash, quickcheck, enumerate]
+
+  let to_string t = Sexp.to_string (sexp_of_t t) |> String.lowercase
+end
+
 module Stable = struct
   module V2 = struct
     type t =
       | Sepa_credit
       | Sepa_instant
-      | Onchain of Network.Stable.V1.t
+      | Onchain of Network.Stable.V2.t
       | Lightning
       | Intraledger
       | Card_scheme
       | Faster_payments
       | Chaps
       | Bacs
+      | Ach of
+          { sec : Ach_sec.t
+          ; same_day : bool
+          }
+      | Rtp
+      | Fedwire
     [@@deriving bin_io, sexp, compare, equal, hash, quickcheck]
   end
 
@@ -47,7 +65,7 @@ module Stable = struct
       | Lightning -> Lightning
       | Intraledger -> Intraledger
       | Card_scheme -> Card_scheme
-      | (Faster_payments | Chaps | Bacs) as rail ->
+      | (Faster_payments | Chaps | Bacs | Ach _ | Rtp | Fedwire) as rail ->
         raise_s
           [%message
             "Rail.Stable.V1 cannot hold this rail; write Rail.Stable.V2" (rail : V2.t)]
@@ -82,6 +100,12 @@ type t = Stable.V2.t =
   | Faster_payments
   | Chaps
   | Bacs
+  | Ach of
+      { sec : Ach_sec.t
+      ; same_day : bool
+      }
+  | Rtp
+  | Fedwire
 [@@deriving sexp, compare, equal, hash, quickcheck]
 
 include (Stable.V1 : Binable.S with type t := t)
@@ -90,6 +114,9 @@ let all =
   [ Sepa_credit; Sepa_instant ]
   @ List.map Network.all ~f:(fun n -> Onchain n)
   @ [ Lightning; Intraledger; Card_scheme; Faster_payments; Chaps; Bacs ]
+  @ List.concat_map Ach_sec.all ~f:(fun sec ->
+    [ Ach { sec; same_day = false }; Ach { sec; same_day = true } ])
+  @ [ Rtp; Fedwire ]
 ;;
 
 let to_string = function
@@ -102,6 +129,10 @@ let to_string = function
   | Faster_payments -> "faster_payments"
   | Chaps -> "chaps"
   | Bacs -> "bacs"
+  | Ach { sec; same_day } ->
+    "ach:" ^ Ach_sec.to_string sec ^ if same_day then ":same_day" else ""
+  | Rtp -> "rtp"
+  | Fedwire -> "fedwire"
 ;;
 
 let of_string s =
@@ -114,12 +145,15 @@ let of_string s =
 ;;
 
 let is_instant = function
-  | Sepa_instant | Lightning | Intraledger | Card_scheme | Faster_payments -> true
-  | Sepa_credit | Onchain _ | Chaps | Bacs -> false
+  | Sepa_instant | Lightning | Intraledger | Card_scheme | Faster_payments | Rtp -> true
+  | Sepa_credit | Onchain _ | Chaps | Bacs | Ach _ | Fedwire -> false
 ;;
 
 let is_returnable = function
-  | Sepa_credit | Sepa_instant | Card_scheme | Faster_payments | Chaps | Bacs -> true
+  | Sepa_credit | Sepa_instant | Card_scheme | Faster_payments | Chaps | Bacs | Ach _ ->
+    true
+  (* RTP and Fedwire payments are final; money comes back only as a new payment. *)
+  | Rtp | Fedwire -> false
   | Onchain _ | Lightning | Intraledger -> false
 ;;
 
@@ -145,10 +179,37 @@ let expected_settlement = function
   | Chaps -> Time_ns.Span.of_day 3.
   (* Bacs is a three-working-day cycle (submit, process, settle); a weekend adds two. *)
   | Bacs -> Time_ns.Span.of_day 5.
+  (* Same Day ACH settles in one of three windows that day; standard ACH next business
+     day, with a weekend in between. *)
+  | Ach { same_day = true; _ } -> Time_ns.Span.of_day 1.
+  | Ach { same_day = false; _ } -> Time_ns.Span.of_day 3.
+  | Rtp -> Time_ns.Span.of_sec 30.
+  (* Fedwire settles within business hours; after the close it waits for the next day. *)
+  | Fedwire -> Time_ns.Span.of_day 3.
 ;;
 
 let is_uk = function
   | Faster_payments | Chaps | Bacs -> true
-  | Sepa_credit | Sepa_instant | Onchain _ | Lightning | Intraledger | Card_scheme ->
-    false
+  | Sepa_credit
+  | Sepa_instant
+  | Onchain _
+  | Lightning
+  | Intraledger
+  | Card_scheme
+  | Ach _
+  | Rtp
+  | Fedwire -> false
+;;
+
+let is_us = function
+  | Ach _ | Rtp | Fedwire -> true
+  | Sepa_credit
+  | Sepa_instant
+  | Onchain _
+  | Lightning
+  | Intraledger
+  | Card_scheme
+  | Faster_payments
+  | Chaps
+  | Bacs -> false
 ;;
