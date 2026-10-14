@@ -77,7 +77,7 @@ let pay ~balances ~beneficiary ~details ~now =
 | `Iban`, `Bic` | ISO 13616 IBAN (country lengths, mod 97, SEPA membership), ISO 9362 BIC |
 | `Crypto_address`, `Base58`, `Bech32` | per-network address checks (Base58Check, SegWit v0/v1+, EIP-55, Tron, Solana) |
 | `Lightning` | BOLT 11 invoices (network, amount, expiry, payment hash), LNURL, Lightning addresses |
-| `Beneficiary` | payee with destination (IBAN, UK account, crypto, Lightning, internal), trusted flag, first seen, payee-name check result (match, close match, no match, not possible, account not found, unavailable) |
+| `Beneficiary` | payee with destination (IBAN, UK or US account, crypto, Lightning, internal, or a local format such as a Kyrgyz BIK and account number, checked by per-scheme hooks), optional postal address for wires, trusted flag, first seen, payee-name check result (match, close match, no match, not possible, account not found, unavailable) |
 | `Iso_reason`, `Iso20022` | reason codes with their R-transaction kinds; payment ids, UETR, creditor reference, remittance, parties, structured addresses, pacs.002 statuses, SEPA character set |
 | `Sepa`, `Target_calendar` | rulebook checks, reason lists per R-transaction, SCT Inst timing, return/recall deadlines in TARGET business days |
 | `Travel_rule`, `Confirmation_policy` | originator/beneficiary data per the EU transfer-of-funds rules; when a deposit counts |
@@ -115,6 +115,27 @@ stays as it was, and the unversioned `bin_io` of these types is still the V1 for
 records that embed them keep their digests; V1 refuses to write a UK rail, account or
 details (raises), and writes the two new payee check results as `Not_possible`. New
 constructors were appended, so V1 bytes are also valid V2 bytes.
+
+Local destinations and beneficiary postal addresses made `Stable.V3` of `Beneficiary`
+(and `Destination`), `Transfer` (and `Counterparty`) and `Standing_order`. V2 and V1 keep
+their digests; they read a beneficiary with no address and refuse (raise) to write a
+local destination or an address, so store such records as V3.
+
+### Local destinations
+
+```ocaml
+Beneficiary.create_local ~id ~owner ~name:"Aibek Toktogulov" ~now
+  ~scheme:Beneficiary.Destination.Local_scheme.kg
+  [ "bank_code", "109018"; "account_number", "1090 0001 2345 6789" ]
+(* Local { scheme = "kg";
+           fields = [ "bank_code", "109018"; "account_number", "1090000123456789" ] } *)
+```
+
+Each scheme can have a validation hook (`Destination.Local_format.create ~scheme
+~validate`) that checks and normalises the fields; `kg` and `ch_qr_iban` ship as
+defaults. A scheme without a hook is accepted after the generic checks (lower snake case
+names, no duplicates, no empty values), so an adapter can carry a format the library does
+not know yet.
 
 ## Known gaps
 
