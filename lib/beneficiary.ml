@@ -80,6 +80,8 @@ let destination_for ~(rail : Rail.t) ?bic ?memo raw =
     then Or_error.error_string "empty account id"
     else Ok (Destination.Internal { account = String.strip raw })
   | Card_scheme -> Or_error.error_string "card payments have no beneficiary"
+  | Faster_payments | Chaps | Bacs ->
+    Or_error.error_string "UK rails need a UK account destination"
 ;;
 
 let create ~id ~owner ~name ~rail ?bic ?memo ~now raw =
