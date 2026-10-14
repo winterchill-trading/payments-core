@@ -93,8 +93,7 @@ module Stable : sig
 
   module V1 : sig
     (** The format before UK destinations (digest [a75ca3f3…]): writing a [Uk_account]
-        destination raises, and newer payee check results are written as
-        [Not_possible]. *)
+        destination raises, and newer payee check results are written as [Not_possible]. *)
     type t = V2.t =
       { id : Id.t
       ; owner : string
