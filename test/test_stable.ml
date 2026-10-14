@@ -12,6 +12,8 @@ let%expect_test "stable bin_prot digests" =
     ; "Crypto_address", [%bin_digest: Crypto_address.Stable.V1.t]
     ; "Lightning.Target", [%bin_digest: Lightning.Target.Stable.V1.t]
     ; "Beneficiary", [%bin_digest: Beneficiary.Stable.V1.t]
+    ; "Beneficiary V2", [%bin_digest: Beneficiary.Stable.V2.t]
+    ; "Uk_account", [%bin_digest: Uk_account.Stable.V1.t]
     ; "Sca.Challenge", [%bin_digest: Sca.Challenge.Stable.V1.t]
     ; "Transfer", [%bin_digest: Transfer.Stable.V1.t]
     ; "Standing_order", [%bin_digest: Standing_order.Stable.V1.t]
@@ -26,6 +28,8 @@ let%expect_test "stable bin_prot digests" =
     Crypto_address     43b704f271695d2835e803b2791b70ee
     Lightning.Target   3b138a460675950e7aa544c9dd14b78b
     Beneficiary        a75ca3f385560ca0ba4035db9d691422
+    Beneficiary V2     01354a5817e7db2d69b741330dbb2e3f
+    Uk_account         6e7545573d853b6b662db8445912a323
     Sca.Challenge      692de572288496b8a81cf5b64932add8
     Transfer           5d0ea6cdb7be87a968a899269f33e433
     Standing_order     39121335464084124a22220017780c99
@@ -97,4 +101,45 @@ let%expect_test "Rail V1 refuses the UK rails" =
     ("Rail.Stable.V1 cannot hold this rail; write Rail.Stable.V2" (rail Chaps))
     ("Rail.Stable.V1 cannot hold this rail; write Rail.Stable.V2" (rail Bacs))
     |}]
+;;
+
+let uk_beneficiary =
+  Beneficiary.create
+    ~id:(Beneficiary.Id.of_string "ben-uk")
+    ~owner:"customer-1"
+    ~name:"Ada Example"
+    ~rail:Faster_payments
+    ~now:(Helpers.at 0)
+    "04-00-04 12345678"
+  |> Or_error.ok_exn
+;;
+
+let%expect_test "Beneficiary V1 refuses a UK account; V2 round trips it" =
+  Expect_test_helpers_core.require_does_raise (fun () ->
+    Bin_prot.Writer.to_string Beneficiary.Stable.V1.bin_writer_t uk_beneficiary);
+  let bytes =
+    Bin_prot.Writer.to_string Beneficiary.Stable.V2.bin_writer_t uk_beneficiary
+  in
+  [%test_result: Beneficiary.t]
+    (Bin_prot.Reader.of_string Beneficiary.Stable.V2.bin_reader_t bytes)
+    ~expect:uk_beneficiary;
+  [%expect
+    {|
+    ("Beneficiary.Destination.Stable.V1 cannot hold a UK account; write V2"
+     "04-00-04 12345678")
+    |}]
+;;
+
+(* Destinations and payee checks gained constructors at the end, so a V1 beneficiary's
+   bytes are also valid V2 bytes. *)
+let%expect_test "Beneficiary V1 bytes read as V2" =
+  let b = Helpers.beneficiary () in
+  let v1 = Bin_prot.Writer.to_string Beneficiary.Stable.V1.bin_writer_t b in
+  [%test_result: string]
+    (Bin_prot.Writer.to_string Beneficiary.Stable.V2.bin_writer_t b)
+    ~expect:v1;
+  [%test_result: Beneficiary.t]
+    (Bin_prot.Reader.of_string Beneficiary.Stable.V2.bin_reader_t v1)
+    ~expect:b;
+  [%expect {| |}]
 ;;
