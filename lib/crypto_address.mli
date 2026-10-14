@@ -3,14 +3,21 @@
     - Bitcoin: Base58Check P2PKH/P2SH and SegWit v0 (Bech32) / v1+ (Bech32m, Taproot).
     - EVM: [0x] plus 40 hex digits; mixed case must carry a valid EIP-55 checksum.
     - Tron: Base58Check of 21 bytes starting with [0x41] (the [T...] form).
-    - Solana: Base58 of exactly 32 bytes (no checksum exists in the format). *)
+    - Solana: Base58 of exactly 32 bytes (no checksum exists in the format).
+    - Spark: Bech32m with the [sp], [spt], [sprt] or [sps] prefix (checksum only). *)
 
 open! Core
 
+(** [bin_io] on [t] is {!Stable.V1}. *)
 type t [@@deriving bin_io, sexp, compare, equal, hash]
 
 module Stable : sig
   module V1 : sig
+    (** The network in {!Network.Stable.V1}: an address on a newer network raises. *)
+    type nonrec t = t [@@deriving bin_io, sexp, compare, equal, hash]
+  end
+
+  module V2 : sig
     type nonrec t = t [@@deriving bin_io, sexp, compare, equal, hash]
   end
 end

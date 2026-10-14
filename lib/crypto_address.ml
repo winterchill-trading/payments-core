@@ -57,7 +57,7 @@ let create (network : Network.t) raw =
   | Bitcoin_testnet ->
     (* tb covers testnet and signet; bcrt is regtest, handy in local test setups. *)
     bitcoin ~network ~versions:[ '\x6f'; '\xc4' ] ~hrps:[ "tb"; "bcrt" ] raw
-  | Ethereum | Polygon ->
+  | Ethereum | Polygon | Base | Arbitrum | Plasma ->
     (match String.chop_prefix raw ~prefix:"0x", eip55 raw with
      | Some body, Some canonical ->
        let single_case =
@@ -77,10 +77,29 @@ let create (network : Network.t) raw =
     (match Base58.decode raw with
      | Some p when String.length p = 32 -> Ok { network; address = raw }
      | _ -> err network raw "expected base58 of 32 bytes")
+  | Spark ->
+    (* Spark addresses are Bech32m with hrp [sp] (mainnet), [spt] (testnet), [sprt]
+       (regtest) or [sps] (signet). Only the checksum and the prefix are checked: the
+       payload layout is the operator's and may change. *)
+    let lower = String.lowercase raw in
+    (match Bech32.decode ~max_length:Int.max_value raw with
+     | Some { hrp; data = _ :: _; variant = Bech32m }
+       when List.mem [ "sp"; "spt"; "sprt"; "sps" ] hrp ~equal:String.equal ->
+       Ok { network; address = lower }
+     | _ ->
+       err network raw "expected a Bech32m address with an sp, spt, sprt or sps prefix")
 ;;
 
 let create_exn network raw = create network raw |> Or_error.ok_exn
 
 module Stable = struct
   module V1 = T
+
+  module V2 = struct
+    type t = T.t =
+      { network : Network.Stable.V2.t
+      ; address : string
+      }
+    [@@deriving bin_io, sexp, compare, equal, hash]
+  end
 end
