@@ -53,6 +53,7 @@ module Destination : sig
     | Lightning of Lightning.Target.Stable.V1.t
     | Internal of { account : string (** ledger account id of the recipient *) }
     | Uk_account of Uk_account.Stable.V1.t (** sort code and account number *)
+    | Us_account of Us_account.Stable.V1.t (** routing and account number, type *)
   [@@deriving sexp, compare, equal, hash]
 
   (** [bin_io] on [t] is {!Stable.V1}. *)
@@ -64,7 +65,8 @@ module Destination : sig
     end
 
     module V1 : sig
-      (** The first four destinations' format; writing a [Uk_account] raises. *)
+      (** The first four destinations' format; writing a [Uk_account], a [Us_account] or a
+          crypto address on a newer network raises. *)
       type nonrec t = t [@@deriving bin_io, sexp, compare, equal, hash]
     end
   end
@@ -75,6 +77,8 @@ module Destination : sig
 
   (** The sort code and account number, from a [Uk_account] or a GB IBAN. *)
   val uk_account : t -> Uk_account.t option
+
+  val us_account : t -> Us_account.t option
 end
 
 module Stable : sig
@@ -125,8 +129,9 @@ include Binable.S with type t := t
 (** Parses the destination for a rail: an IBAN for SEPA rails, an address on the rail's
     network for on-chain, an invoice, LNURL or address for Lightning, an account id for
     intraledger, a sort code and account number or a GB IBAN for the UK rails
-    ({!Uk_account.of_string}, checked against [modulus] when given, with [roll_number]).
-    New beneficiaries start untrusted. *)
+    ({!Uk_account.of_string}, checked against [modulus] when given, with [roll_number]), a
+    routing number, account number and optional type for the US rails
+    ({!Us_account.of_string}). New beneficiaries start untrusted. *)
 val create
   :  id:Id.t
   -> owner:string

@@ -79,12 +79,13 @@ module Destination = struct
           ; bic : Bic.Stable.V1.t option
           }
       | Crypto of
-          { address : Crypto_address.Stable.V1.t
+          { address : Crypto_address.Stable.V2.t
           ; memo : string option
           }
       | Lightning of Lightning.Target.Stable.V1.t
       | Internal of { account : string }
       | Uk_account of Uk_account.Stable.V1.t
+      | Us_account of Us_account.Stable.V1.t
     [@@deriving bin_io, sexp, compare, equal, hash]
   end
 
@@ -126,6 +127,11 @@ module Destination = struct
                   [%message
                     "Beneficiary.Destination.Stable.V1 cannot hold a UK account; write V2"
                       ~_:(Uk_account.to_string account : string)]
+              | Us_account account ->
+                raise_s
+                  [%message
+                    "Beneficiary.Destination.Stable.V1 cannot hold a US account; write V2"
+                      ~_:(Us_account.to_string account : string)]
             ;;
 
             let of_binable : Repr.t -> t = function
@@ -150,6 +156,7 @@ module Destination = struct
     | Lightning of Lightning.Target.Stable.V1.t
     | Internal of { account : string }
     | Uk_account of Uk_account.Stable.V1.t
+    | Us_account of Us_account.Stable.V1.t
   [@@deriving sexp, compare, equal, hash]
 
   include (Stable.V1 : Binable.S with type t := t)
@@ -164,12 +171,18 @@ module Destination = struct
     | Lightning _ -> [ Lightning ]
     | Internal _ -> [ Intraledger ]
     | Uk_account _ -> uk_rails
+    | Us_account _ -> List.filter Rail.all ~f:Rail.is_us
   ;;
 
   let uk_account = function
     | Uk_account a -> Some a
     | Bank_account { iban; _ } -> Uk_account.of_iban iban |> Result.ok
-    | Crypto _ | Lightning _ | Internal _ -> None
+    | Crypto _ | Lightning _ | Internal _ | Us_account _ -> None
+  ;;
+
+  let us_account = function
+    | Us_account a -> Some a
+    | Bank_account _ | Crypto _ | Lightning _ | Internal _ | Uk_account _ -> None
   ;;
 end
 
@@ -254,6 +267,9 @@ let destination_for ~(rail : Rail.t) ?bic ?memo ?roll_number ?modulus raw =
           ()
     in
     Destination.Uk_account account
+  | Ach _ | Rtp | Fedwire ->
+    let%map account = Us_account.of_string raw in
+    Destination.Us_account account
 ;;
 
 let create ~id ~owner ~name ~rail ?bic ?memo ?roll_number ?modulus ~now raw =
