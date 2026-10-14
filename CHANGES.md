@@ -50,6 +50,11 @@ All notable changes to this project are documented here. The format follows
   `create ?postal_address`, `create_local ?postal_address` or `with_postal_address`, and
   `Beneficiary.check_for_rail ?address_required`, which also asks for the address on
   `Fedwire` and `Chaps` by default (`default_address_required`).
+- `Destination.check_local`, `Destination.Field_error` and `Destination.Local_error`:
+  local destination validation that reports each problem with the field it concerns
+  (field name and reason) and keeps `create_local`'s error as the summary.
+  `Local_format.with_field_errors` and `Local_format.field_errors` add a per-field check to
+  a format; `kg` and `ch_qr_iban` have one. `create_local` is unchanged.
 - `Stable.V3` of `Beneficiary`, `Beneficiary.Destination`, `Transfer`,
   `Transfer.Counterparty` and `Standing_order`, which hold local destinations and
   addresses. V2 and V1 keep their digests, read with no address, and raise on writing a
