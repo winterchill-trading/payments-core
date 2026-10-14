@@ -137,6 +137,22 @@ defaults. A scheme without a hook is accepted after the generic checks (lower sn
 names, no duplicates, no empty values), so an adapter can carry a format the library does
 not know yet.
 
+A form wants to mark the input that is wrong. `Destination.check_local` takes the same
+arguments and refuses with every problem by field, plus `create_local`'s error as the
+summary:
+
+```ocaml
+Beneficiary.Destination.check_local ~scheme:Beneficiary.Destination.Local_scheme.kg
+  [ "bank_code", "10901"; "account_number", "109000012345678X" ]
+(* Error { fields = [ { field = Some "bank_code"; reason = "expected 6 digits" }
+                    ; { field = Some "account_number"; reason = "expected 16 digits" } ]
+         ; summary = ... } *)
+```
+
+A problem that is not about one field (the scheme name, no fields) has `field = None`. A
+custom hook adds field errors with `Local_format.with_field_errors`; without them, its
+error is reported once with no field.
+
 ## Known gaps
 
 - BOLT 11 node signatures are not verified (needs secp256k1 key recovery); the paying
