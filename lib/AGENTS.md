@@ -5,7 +5,8 @@ these states and lives outside this repository.
 
 - Rails and identifiers: `Rail`, `Network`, `Iban`, `Bic`, `Crypto_address`, `Base58`, `Bech32`,
   `Lightning`, `Beneficiary`, `Iso_reason`, `Iso20022`, `Sepa`, `Target_calendar`, and the UK
-  `Sort_code`, `Uk_account`, `Uk_modulus` (published modulus check), `Uk_scheme`.
+  `Sort_code`, `Uk_account`, `Uk_modulus` (published modulus check), `Uk_scheme`, and the US
+  `Aba`, `Us_account`, `Us_scheme`.
 - Lifecycles: `Transfer` (status machine with reason-coded rejects, returns, recalls, SCT Inst
   time-outs, reorgs), `Sca`, `Standing_order`, `Schedule`, `Swap`.
 - Booking: `Booking` turns each transition into balanced `ledger` entries, one linked group per
