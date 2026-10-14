@@ -16,7 +16,9 @@ let%expect_test "stable bin_prot digests" =
     ; "Uk_account", [%bin_digest: Uk_account.Stable.V1.t]
     ; "Sca.Challenge", [%bin_digest: Sca.Challenge.Stable.V1.t]
     ; "Transfer", [%bin_digest: Transfer.Stable.V1.t]
+    ; "Transfer V2", [%bin_digest: Transfer.Stable.V2.t]
     ; "Standing_order", [%bin_digest: Standing_order.Stable.V1.t]
+    ; "Standing_order V2", [%bin_digest: Standing_order.Stable.V2.t]
     ]
     ~f:(fun (name, digest) -> printf "%-18s %s\n" name digest);
   [%expect
@@ -32,7 +34,9 @@ let%expect_test "stable bin_prot digests" =
     Uk_account         6e7545573d853b6b662db8445912a323
     Sca.Challenge      692de572288496b8a81cf5b64932add8
     Transfer           5d0ea6cdb7be87a968a899269f33e433
+    Transfer V2        348da132bb458ea28c969586a56bbc0b
     Standing_order     39121335464084124a22220017780c99
+    Standing_order V2  4c7861e04b15856bc476b849abbeb3cc
     |}]
 ;;
 
