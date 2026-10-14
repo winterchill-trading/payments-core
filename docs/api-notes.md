@@ -87,3 +87,28 @@ not list cannot be checked and counts as valid. Weights can be negative (`-1`). 
 test cases in chapter 3 of the specification all give the expected answer over the
 matching lines of the v8.50 tables (test 13 is an exception 6 foreign currency account,
 reported `Not_checked`).
+
+## US rails
+
+- ACH credits carry a NACHA standard entry class (PPD for consumers, CCD and CTX for
+  companies, WEB and TEL for entries authorised online or by phone) and settle next
+  business day, or the same day for Same Day ACH, which NACHA limits to USD 1,000,000 per
+  entry (since March 2022). ACH credits can be returned (R-codes) after settlement.
+- RTP: seconds, around the clock; the network limit is USD 10,000,000 (since February
+  2025) and banks set lower ones, so `Us_scheme.Rules` takes one. RTP and Fedwire
+  payments are final: money comes back only as a new payment.
+- Fedwire Funds: real-time gross settlement during Federal Reserve business hours, no
+  limit.
+- Routing numbers have nine digits; the ninth is a check digit with weights 3, 7, 1
+  repeated, summing to a multiple of 10. Account numbers have no national format (4 to
+  17 digits here); checking and savings matter to ACH (transaction codes).
+- References: 80 characters on ACH (one addenda record), 140 on RTP and Fedwire.
+
+## Newer networks
+
+- Base and Arbitrum are Ethereum layer 2s with EVM addresses; their "finalized" block
+  follows the Ethereum batch (about half an hour end to end). Plasma is an EVM chain for
+  stablecoins with BFT finality per block.
+- Spark is a Bitcoin layer 2 whose transfers are final once its operators sign. Its
+  addresses are Bech32m with prefixes `sp`, `spt`, `sprt` and `sps`; the payload layout is
+  not checked here.
