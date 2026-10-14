@@ -120,6 +120,8 @@ module Details : sig
     | Card
     | Uk_domestic of Uk_scheme.Details.Stable.V1.t
     (** Faster Payments, CHAPS and Bacs: the scheme's id and the value date *)
+    | Us_domestic of Us_scheme.Details.Stable.V1.t
+    (** ACH, RTP and Fedwire: the network's id and the ACH effective date *)
   [@@deriving sexp, compare, equal]
 
   (** [bin_io] on [t] is {!Stable.V1}, so records that embed details keep their format. *)
@@ -131,7 +133,7 @@ module Details : sig
     end
 
     module V1 : sig
-      (** The first five kinds' format; writing [Uk_domestic] raises. *)
+      (** The first five kinds' format; writing [Uk_domestic] or [Us_domestic] raises. *)
       type nonrec t = t [@@deriving bin_io, sexp, compare, equal]
     end
   end
@@ -205,7 +207,7 @@ type t = Stable.V2.t =
     need GBP and pass {!Uk_scheme.validate} under [uk_rules] (default
     {!Uk_scheme.Rules.default}), and a CHAPS draft without a value date gets
     {!Uk_scheme.chaps_value_date} at [now]. Other rails get their details filled in when
-    omitted. *)
+    omitted. US rails need USD and pass {!Us_scheme.validate} under [us_rules]. *)
 val draft
   :  id:Id.t
   -> rail:Rail.t
@@ -217,6 +219,7 @@ val draft
   -> ?details:Details.t
   -> ?eur_value:Money.Amount.t
   -> ?uk_rules:Uk_scheme.Rules.t
+  -> ?us_rules:Us_scheme.Rules.t
   -> now:Time_ns.t
   -> unit
   -> t Or_error.t

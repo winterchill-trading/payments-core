@@ -134,6 +134,7 @@ module Details = struct
       | Intraledger
       | Card
       | Uk_domestic of Uk_scheme.Details.Stable.V1.t
+      | Us_domestic of Us_scheme.Details.Stable.V1.t
     [@@deriving bin_io, sexp, compare, equal]
   end
 
@@ -177,9 +178,10 @@ module Details = struct
                 Lightning { payment_hash; preimage }
               | Intraledger -> Intraledger
               | Card -> Card
-              | Uk_domestic _ ->
+              | Uk_domestic _ | Us_domestic _ ->
                 raise_s
-                  [%message "Transfer.Details.Stable.V1 cannot hold UK details; write V2"]
+                  [%message
+                    "Transfer.Details.Stable.V1 cannot hold UK or US details; write V2"]
             ;;
 
             let of_binable : Repr.t -> t = function
@@ -211,6 +213,7 @@ module Details = struct
     | Intraledger
     | Card
     | Uk_domestic of Uk_scheme.Details.Stable.V1.t
+    | Us_domestic of Us_scheme.Details.Stable.V1.t
   [@@deriving sexp, compare, equal]
 
   include (Stable.V1 : Binable.S with type t := t)
@@ -283,6 +286,7 @@ let check_details
   ?eur_value
   ?(reference = "")
   ?(uk_rules = Uk_scheme.Rules.default)
+  ?(us_rules = Us_scheme.Rules.default)
   ?(now = Time_ns.epoch)
   details
   =
@@ -314,6 +318,21 @@ let check_details
       | _ -> Ok d.value_date
     in
     Details.Uk_domestic { d with value_date }
+  | None, (None | Some (Us_domestic _)), (Ach _ | Rtp | Fedwire) ->
+    let%map () =
+      match direction with
+      (* As for UK rails: limits bind what we send; incoming only checks the currency. *)
+      | Out -> Us_scheme.validate ~rules:us_rules rail ~amount ~reference
+      | In ->
+        if Money.Currency.equal (Money.Amount.currency amount) Money.Currency.usd
+        then Ok ()
+        else
+          Or_error.error_s
+            [%message "US domestic payments are in USD" (amount : Money.Amount.t)]
+    in
+    (match details with
+     | Some (Us_domestic d) -> Details.Us_domestic d
+     | _ -> Details.Us_domestic Us_scheme.Details.empty)
   | Some scheme, Some (Sepa d), _ ->
     let%bind () = Sepa.validate scheme d ~amount in
     let%map () =
@@ -361,6 +380,7 @@ let draft
   ?details
   ?eur_value
   ?uk_rules
+  ?us_rules
   ~now
   ()
   =
@@ -400,6 +420,7 @@ let draft
       ?eur_value
       ~reference
       ?uk_rules
+      ?us_rules
       ~now
       details
   in
