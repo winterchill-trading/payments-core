@@ -78,6 +78,10 @@ from that repository.
   V1 format (kept for digests elsewhere) and raises on UK values: store transfers with
   `Transfer.Stable.V2`. A new constructor goes at the end of a V2 type, never into a
   `Repr` module (those fix the V1 shape).
+- Once a version has been published (in the opam repository), it is frozen too:
+  `Destination.Local` and `Beneficiary.postal_address` went into `Stable.V3`, with V2
+  rebuilt over a `Repr` of its old shape. Store beneficiaries, transfers and standing
+  orders with V3 when they can hold a local destination or an address.
 - A transfer's hold, fee and capture are booked as one linked group: all or nothing.
 - `Swap.Quote.t` has public fields and `Swap.execute` does not recompute amounts from the rate; build
   the record directly when a pricing rule must apply.
