@@ -20,8 +20,29 @@ module Status : sig
 end
 
 module Stable : sig
-  module V2 : sig
+  module V3 : sig
     type t =
+      { id : Id.Stable.V1.t
+      ; account : Ledger.Account_id.Stable.V1.t
+      ; beneficiary : Beneficiary.Stable.V3.t
+      ; rail : Rail.Stable.V2.t
+      ; amount : Money.Amount.Stable.V1.t
+      ; reference : string
+      ; details : Transfer.Details.Stable.V2.t option
+      ; schedule : Schedule.t
+      ; until : Date.Stable.V1.t option (** last date a run may fall on *)
+      ; next_run : Date.Stable.V1.t
+      ; status : Status.t
+      ; runs : int
+      ; last_run : Date.Stable.V1.t option
+      }
+    [@@deriving bin_io, sexp, compare, equal]
+  end
+
+  module V2 : sig
+    (** The format before local destinations and beneficiary addresses: writing such a
+        beneficiary raises. *)
+    type t = V3.t =
       { id : Id.Stable.V1.t
       ; account : Ledger.Account_id.Stable.V1.t
       ; beneficiary : Beneficiary.Stable.V2.t
@@ -60,7 +81,7 @@ module Stable : sig
   end
 end
 
-type t = Stable.V2.t =
+type t = Stable.V3.t =
   { id : Id.t
   ; account : Ledger.Account_id.t
   ; beneficiary : Beneficiary.t

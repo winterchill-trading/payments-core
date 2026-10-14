@@ -17,8 +17,27 @@ module Status = struct
 end
 
 module Stable = struct
-  module V2 = struct
+  module V3 = struct
     type t =
+      { id : Id.Stable.V1.t
+      ; account : Ledger.Account_id.Stable.V1.t
+      ; beneficiary : Beneficiary.Stable.V3.t
+      ; rail : Rail.Stable.V2.t
+      ; amount : Money.Amount.Stable.V1.t
+      ; reference : string
+      ; details : Transfer.Details.Stable.V2.t option
+      ; schedule : Schedule.t
+      ; until : Date.Stable.V1.t option
+      ; next_run : Date.Stable.V1.t
+      ; status : Status.t
+      ; runs : int
+      ; last_run : Date.Stable.V1.t option
+      }
+    [@@deriving bin_io, sexp, compare, equal]
+  end
+
+  module V2 = struct
+    type t = V3.t =
       { id : Id.Stable.V1.t
       ; account : Ledger.Account_id.Stable.V1.t
       ; beneficiary : Beneficiary.Stable.V2.t
