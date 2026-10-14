@@ -8,16 +8,137 @@ module Id =
     ()
 
 module Payee_check = struct
-  type t =
+  module T = struct
+    type t =
+      | Match
+      | Close_match of { suggested_name : string }
+      | No_match
+      | Not_possible
+      | Account_not_found
+      | Unavailable
+    [@@deriving bin_io, sexp, compare, equal, hash]
+  end
+
+  module Stable = struct
+    module V2 = T
+
+    module V1 = struct
+      (* The original four results: the bin_prot shape and digest come from here. *)
+      module Repr = struct
+        type t =
+          | Match
+          | Close_match of { suggested_name : string }
+          | No_match
+          | Not_possible
+        [@@deriving bin_io]
+      end
+
+      type t = T.t [@@deriving sexp, compare, equal, hash]
+
+      include
+        Binable.Of_binable_without_uuid [@alert "-legacy"]
+          (Repr)
+          (struct
+            type nonrec t = t
+
+            let to_binable : t -> Repr.t = function
+              | Match -> Match
+              | Close_match { suggested_name } -> Close_match { suggested_name }
+              | No_match -> No_match
+              (* Both refine "the check could not be made", which is all V1 can say. *)
+              | Not_possible | Account_not_found | Unavailable -> Not_possible
+            ;;
+
+            let of_binable : Repr.t -> t = function
+              | Match -> Match
+              | Close_match { suggested_name } -> Close_match { suggested_name }
+              | No_match -> No_match
+              | Not_possible -> Not_possible
+            ;;
+          end)
+    end
+  end
+
+  type t = T.t =
     | Match
     | Close_match of { suggested_name : string }
     | No_match
     | Not_possible
-  [@@deriving bin_io, sexp, compare, equal, hash]
+    | Account_not_found
+    | Unavailable
+  [@@deriving sexp, compare, equal, hash]
+
+  include (Stable.V1 : Binable.S with type t := t)
 end
 
 module Destination = struct
-  type t =
+  module T = struct
+    type t =
+      | Bank_account of
+          { iban : Iban.Stable.V1.t
+          ; bic : Bic.Stable.V1.t option
+          }
+      | Crypto of
+          { address : Crypto_address.Stable.V1.t
+          ; memo : string option
+          }
+      | Lightning of Lightning.Target.Stable.V1.t
+      | Internal of { account : string }
+      | Uk_account of Uk_account.Stable.V1.t
+    [@@deriving bin_io, sexp, compare, equal, hash]
+  end
+
+  module Stable = struct
+    module V2 = T
+
+    module V1 = struct
+      (* The original four destinations: the bin_prot shape and digest come from here. *)
+      module Repr = struct
+        type t =
+          | Bank_account of
+              { iban : Iban.Stable.V1.t
+              ; bic : Bic.Stable.V1.t option
+              }
+          | Crypto of
+              { address : Crypto_address.Stable.V1.t
+              ; memo : string option
+              }
+          | Lightning of Lightning.Target.Stable.V1.t
+          | Internal of { account : string }
+        [@@deriving bin_io]
+      end
+
+      type t = T.t [@@deriving sexp, compare, equal, hash]
+
+      include
+        Binable.Of_binable_without_uuid [@alert "-legacy"]
+          (Repr)
+          (struct
+            type nonrec t = t
+
+            let to_binable : t -> Repr.t = function
+              | Bank_account { iban; bic } -> Bank_account { iban; bic }
+              | Crypto { address; memo } -> Crypto { address; memo }
+              | Lightning target -> Lightning target
+              | Internal { account } -> Internal { account }
+              | Uk_account account ->
+                raise_s
+                  [%message
+                    "Beneficiary.Destination.Stable.V1 cannot hold a UK account; write V2"
+                      ~_:(Uk_account.to_string account : string)]
+            ;;
+
+            let of_binable : Repr.t -> t = function
+              | Bank_account { iban; bic } -> Bank_account { iban; bic }
+              | Crypto { address; memo } -> Crypto { address; memo }
+              | Lightning target -> Lightning target
+              | Internal { account } -> Internal { account }
+            ;;
+          end)
+    end
+  end
+
+  type t = T.t =
     | Bank_account of
         { iban : Iban.Stable.V1.t
         ; bic : Bic.Stable.V1.t option
@@ -28,35 +149,74 @@ module Destination = struct
         }
     | Lightning of Lightning.Target.Stable.V1.t
     | Internal of { account : string }
-  [@@deriving bin_io, sexp, compare, equal, hash]
+    | Uk_account of Uk_account.Stable.V1.t
+  [@@deriving sexp, compare, equal, hash]
+
+  include (Stable.V1 : Binable.S with type t := t)
+
+  let uk_rails = [ Rail.Faster_payments; Chaps; Bacs ]
 
   let rails = function
     | Bank_account { iban; _ } ->
-      if Iban.is_sepa iban then [ Rail.Sepa_credit; Sepa_instant ] else []
+      (if Iban.is_sepa iban then [ Rail.Sepa_credit; Sepa_instant ] else [])
+      @ if String.equal (Iban.country iban) "GB" then uk_rails else []
     | Crypto { address; _ } -> [ Onchain (Crypto_address.network address) ]
     | Lightning _ -> [ Lightning ]
     | Internal _ -> [ Intraledger ]
+    | Uk_account _ -> uk_rails
+  ;;
+
+  let uk_account = function
+    | Uk_account a -> Some a
+    | Bank_account { iban; _ } -> Uk_account.of_iban iban |> Result.ok
+    | Crypto _ | Lightning _ | Internal _ -> None
   ;;
 end
 
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       { id : Id.t
       ; owner : string
       ; name : string
-      ; destination : Destination.t
+      ; destination : Destination.Stable.V2.t
       ; trusted : bool
       ; first_seen : Utc_time.Stable.V1.t
-      ; payee_check : Payee_check.t option
+      ; payee_check : Payee_check.Stable.V2.t option
       }
     [@@deriving bin_io, sexp, compare, equal, hash, fields]
   end
+
+  module V1 = struct
+    (* Same record as V2; only the field formats differ, so the shape (and digest) is the
+       original one. *)
+    type t = V2.t =
+      { id : Id.t
+      ; owner : string
+      ; name : string
+      ; destination : Destination.Stable.V1.t
+      ; trusted : bool
+      ; first_seen : Utc_time.Stable.V1.t
+      ; payee_check : Payee_check.Stable.V1.t option
+      }
+    [@@deriving bin_io, sexp, compare, equal, hash]
+  end
 end
 
-include Stable.V1
+type t = Stable.V2.t =
+  { id : Id.t
+  ; owner : string
+  ; name : string
+  ; destination : Destination.t
+  ; trusted : bool
+  ; first_seen : Utc_time.t
+  ; payee_check : Payee_check.t option
+  }
+[@@deriving sexp, compare, equal, hash, fields]
 
-let destination_for ~(rail : Rail.t) ?bic ?memo raw =
+include (Stable.V1 : Binable.S with type t := t)
+
+let destination_for ~(rail : Rail.t) ?bic ?memo ?roll_number ?modulus raw =
   let open Or_error.Let_syntax in
   match rail with
   | Sepa_credit | Sepa_instant ->
@@ -81,10 +241,22 @@ let destination_for ~(rail : Rail.t) ?bic ?memo raw =
     else Ok (Destination.Internal { account = String.strip raw })
   | Card_scheme -> Or_error.error_string "card payments have no beneficiary"
   | Faster_payments | Chaps | Bacs ->
-    Or_error.error_string "UK rails need a UK account destination"
+    let%bind account = Uk_account.of_string ?modulus raw in
+    let%map account =
+      match roll_number with
+      | None -> Ok account
+      | Some roll_number ->
+        Uk_account.create
+          ?modulus
+          ~roll_number
+          ~sort_code:account.sort_code
+          ~account_number:account.account_number
+          ()
+    in
+    Destination.Uk_account account
 ;;
 
-let create ~id ~owner ~name ~rail ?bic ?memo ~now raw =
+let create ~id ~owner ~name ~rail ?bic ?memo ?roll_number ?modulus ~now raw =
   let open Or_error.Let_syntax in
   let name = String.strip name in
   let%bind () =
@@ -92,7 +264,7 @@ let create ~id ~owner ~name ~rail ?bic ?memo ~now raw =
     then Or_error.error_string "beneficiary name is empty"
     else Ok ()
   in
-  let%map destination = destination_for ~rail ?bic ?memo raw in
+  let%map destination = destination_for ~rail ?bic ?memo ?roll_number ?modulus raw in
   { id; owner; name; destination; trusted = false; first_seen = now; payee_check = None }
 ;;
 
