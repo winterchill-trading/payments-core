@@ -2,7 +2,8 @@
 
 Provider-neutral payment rails and transfer lifecycles in OxCaml: SEPA Credit Transfer
 and SCT Inst with their ISO 20022 fields and reason codes, UK Faster Payments, CHAPS and
-Bacs with sort codes and the published modulus check, on-chain transfers with
+Bacs with sort codes and the published modulus check, US ACH, RTP and Fedwire with ABA
+routing numbers, on-chain transfers with
 travel-rule data, Lightning, intraledger moves; beneficiary validation; strong customer
 authentication; standing orders; currency swaps; and the pure booking rules that turn
 every transfer transition into balanced `ledger` entries. Reconciliation compares the
@@ -69,9 +70,10 @@ let pay ~balances ~beneficiary ~details ~now =
 
 | Module | What it is |
 | --- | --- |
-| `Rail`, `Network` | SEPA credit / instant, Faster Payments, CHAPS, Bacs, on-chain per network, Lightning, intraledger, card scheme |
+| `Rail`, `Network` | SEPA credit / instant, Faster Payments, CHAPS, Bacs, ACH, RTP, Fedwire, on-chain per network (Bitcoin, Ethereum, Polygon, Tron, Solana, Base, Arbitrum, Plasma, Spark), Lightning, intraledger, card scheme |
 | `Sort_code`, `Uk_account`, `Uk_modulus` | UK sort codes, account numbers with roll numbers, GB IBAN conversion, the published modulus check |
 | `Uk_scheme` | Faster Payments limit (configurable), CHAPS cut-off hook and value dates, references, UK transfer details |
+| `Aba`, `Us_account`, `Us_scheme` | US routing numbers (check digit), accounts (checking or savings), ACH standard entry classes and Same Day limit, RTP limit (configurable), Fedwire, US transfer details |
 | `Iban`, `Bic` | ISO 13616 IBAN (country lengths, mod 97, SEPA membership), ISO 9362 BIC |
 | `Crypto_address`, `Base58`, `Bech32` | per-network address checks (Base58Check, SegWit v0/v1+, EIP-55, Tron, Solana) |
 | `Lightning` | BOLT 11 invoices (network, amount, expiry, payment hash), LNURL, Lightning addresses |
@@ -107,7 +109,7 @@ vectors and fixtures in CI.
 ## Stable formats
 
 Each wire type has `Stable` versions with digests pinned in `test/test_stable.ml`. The UK
-additions made `Stable.V2` of `Rail`, `Beneficiary` (with its `Destination` and
+and US additions and the newer networks made `Stable.V2` of `Network`, `Crypto_address`, `Rail`, `Beneficiary` (with its `Destination` and
 `Payee_check`), `Transfer` (with `Counterparty` and `Details`) and `Standing_order`. V1
 stays as it was, and the unversioned `bin_io` of these types is still the V1 format so
 records that embed them keep their digests; V1 refuses to write a UK rail, account or
@@ -131,3 +133,7 @@ constructors were appended, so V1 bytes are also valid V2 bytes.
   bank passes its own hook. Faster Payments reason codes are not validated (any ISO
   reason is accepted on UK rails).
 - Bacs is a stub: no files, service user numbers or processing calendar.
+- US rails: no cut-off times, Federal Reserve holidays, NACHA files or R-code tables; ACH
+  returns carry whatever four-character reason the provider reports. FedNow is not a
+  rail yet. A routing number with a valid check digit may still be unassigned.
+- Spark addresses are checked for prefix and Bech32m checksum only.
