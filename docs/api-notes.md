@@ -54,3 +54,36 @@ entry reference.
 - An exempted payment records the exemption and its article; low-value remote (art. 16:
   30 EUR, 100 EUR or 5 payments) and contactless (art. 11: 50, 150, 5) use counters
   since the last SCA. We require both the sum and the count limits, the stricter reading.
+
+## UK rails
+
+- Faster Payments: seconds, around the clock, GBP only, scheme limit GBP 1,000,000 per
+  payment (since February 2022); each bank sets its own lower limit, so
+  `Uk_scheme.Rules` takes one. A receiving bank may hold a payment for up to two hours,
+  which `Rail.expected_settlement` uses. Payments can be returned by the receiving bank.
+- CHAPS: real-time gross settlement at the central bank on business days, no limit. The
+  scheme day closes at 18:00 UK time; banks take customer payments until an earlier
+  cut-off of their own, and bank holidays close the day, so the cut-off is a hook
+  (`Date.t -> Time_ns.t option`). A CHAPS draft gets the first value date whose cut-off
+  has not passed.
+- Bacs Direct Credit: a three-working-day cycle; modelled only as a rail with GBP and an
+  18-character reference of `A-Z 0-9 . & / -` and space.
+- References: 18 characters on Faster Payments and Bacs, 140 on CHAPS (ISO 20022
+  unstructured remittance).
+- UK accounts are a six-digit sort code and an eight-digit account number; some building
+  societies add a roll number. A GB IBAN holds both after the four-letter bank code.
+
+## UK modulus checking
+
+The published specification ("Validating account numbers", v8) runs one or two checks
+per sort code from a weight table: MOD10, MOD11, or double alternate (sum of the digits of
+each product, modulus 10), with fourteen exceptions. Rules implemented: 1 (add 27), 2 and 9
+(alternative weights, then sort code 309634 if the first fails), 3 (skip the second check
+when `c` is 6 or 9), 4 (remainder equals `gh`), 5 (substituted sort code; check digits
+`g` and `h`), 6 (foreign currency accounts cannot be checked), 7 and 10 (zero `u` to `b`
+when `g` is 9), 8 (sort code 090126), 10 and 11, 12 and 13 (either check passing is
+enough), 14 (drop `h` when it is 0, 1 or 9 and shift right). A sort code the table does
+not list cannot be checked and counts as valid. Weights can be negative (`-1`). The 34
+test cases in chapter 3 of the specification all give the expected answer over the
+matching lines of the v8.50 tables (test 13 is an exception 6 foreign currency account,
+reported `Not_checked`).
