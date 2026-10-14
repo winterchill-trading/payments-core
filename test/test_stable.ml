@@ -6,10 +6,14 @@ open Payments_core
 let%expect_test "stable bin_prot digests" =
   List.iter
     [ "Network", [%bin_digest: Network.Stable.V1.t]
+    ; "Network V2", [%bin_digest: Network.Stable.V2.t]
     ; "Rail", [%bin_digest: Rail.Stable.V1.t]
     ; "Rail V2", [%bin_digest: Rail.Stable.V2.t]
     ; "Iban", [%bin_digest: Iban.Stable.V1.t]
     ; "Crypto_address", [%bin_digest: Crypto_address.Stable.V1.t]
+    ; "Crypto_address V2", [%bin_digest: Crypto_address.Stable.V2.t]
+    ; "Aba", [%bin_digest: Aba.Stable.V1.t]
+    ; "Us_account", [%bin_digest: Us_account.Stable.V1.t]
     ; "Lightning.Target", [%bin_digest: Lightning.Target.Stable.V1.t]
     ; "Beneficiary", [%bin_digest: Beneficiary.Stable.V1.t]
     ; "Beneficiary V2", [%bin_digest: Beneficiary.Stable.V2.t]
@@ -24,19 +28,23 @@ let%expect_test "stable bin_prot digests" =
   [%expect
     {|
     Network            180a350eb7c08de68cbf9d0f401227c7
+    Network V2         230269990e834e3234f64c0c552fbc80
     Rail               8dfb73bd6a838ed1c3162c265c00348e
-    Rail V2            2e597fed04a0c57f1747f3e896a3bde8
+    Rail V2            fee5a27b75a6b2b5ba1d49211ee91bdb
     Iban               d9a8da25d5656b016fb4dbdc2e4197fb
     Crypto_address     43b704f271695d2835e803b2791b70ee
+    Crypto_address V2  3fbc05fb09020fb57e3e0e14fcd0e075
+    Aba                d9a8da25d5656b016fb4dbdc2e4197fb
+    Us_account         faf03819c021ce77bf9689ca9a8ede35
     Lightning.Target   3b138a460675950e7aa544c9dd14b78b
     Beneficiary        a75ca3f385560ca0ba4035db9d691422
-    Beneficiary V2     01354a5817e7db2d69b741330dbb2e3f
+    Beneficiary V2     a85e2adcac09faa994c19cf238277036
     Uk_account         6e7545573d853b6b662db8445912a323
     Sca.Challenge      692de572288496b8a81cf5b64932add8
     Transfer           5d0ea6cdb7be87a968a899269f33e433
-    Transfer V2        348da132bb458ea28c969586a56bbc0b
+    Transfer V2        66c69aec0eb90148648f1fde8e873a6b
     Standing_order     39121335464084124a22220017780c99
-    Standing_order V2  4c7861e04b15856bc476b849abbeb3cc
+    Standing_order V2  3d51c4973f10ad2fa929734d2b745ad0
     |}]
 ;;
 
